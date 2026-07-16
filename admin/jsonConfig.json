@@ -41,10 +41,6 @@
 				{
 					"label": "US",
 					"value": "US"
-				},
-				{
-					"label": "CN",
-					"value": "CN"
 				}
 			],
 			"xs": 12,

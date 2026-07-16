@@ -1,11 +1,8 @@
-/*
- * Created with @iobroker/create-adapter v3.1.5
- */
-
 import * as utils from '@iobroker/adapter-core';
 import {
 	DreoClient,
 	type DiscoveredState,
+	type DreoDevice,
 	type DreoDeviceDiscoveredEvent,
 	type DreoDeviceDiscoveredUnsubscribe,
 	type DreoDeviceStateChangeEvent,
@@ -17,6 +14,183 @@ import {
 
 import { validateConfig } from './lib/config';
 
+interface FriendlyStateDefinition {
+	channelId: string;
+	path: readonly string[];
+	channelNames: readonly string[];
+	stateId: string;
+	stateName: string;
+	rawKey: string;
+	type: 'boolean' | 'number' | 'string';
+	role: string;
+	unit?: string;
+}
+
+const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
+	{
+		channelId: 'power',
+		path: ['power', 'on'],
+		channelNames: ['Power'],
+		stateId: 'on',
+		stateName: 'Power',
+		rawKey: 'poweron',
+		type: 'boolean',
+		role: 'switch.power',
+	},
+	{
+		channelId: 'fan',
+		path: ['fan', 'on'],
+		channelNames: ['Fan'],
+		stateId: 'on',
+		stateName: 'Fan',
+		rawKey: 'fanon',
+		type: 'boolean',
+		role: 'switch',
+	},
+	{
+		channelId: 'fan',
+		path: ['fan', 'speed'],
+		channelNames: ['Fan'],
+		stateId: 'speed',
+		stateName: 'Speed',
+		rawKey: 'windlevel',
+		type: 'number',
+		role: 'level',
+	},
+	{
+		channelId: 'fan',
+		path: ['fan', 'mode'],
+		channelNames: ['Fan'],
+		stateId: 'mode',
+		stateName: 'Mode',
+		rawKey: 'mode',
+		type: 'number',
+		role: 'value',
+	},
+	{
+		channelId: 'fan',
+		path: ['fan', 'oscillationMode'],
+		channelNames: ['Fan'],
+		stateId: 'oscillationMode',
+		stateName: 'Oscillation mode',
+		rawKey: 'oscmode',
+		type: 'number',
+		role: 'value',
+	},
+	{
+		channelId: 'mainLight',
+		path: ['light', 'main', 'on'],
+		channelNames: ['Light', 'Main light'],
+		stateId: 'on',
+		stateName: 'Main light',
+		rawKey: 'lighton',
+		type: 'boolean',
+		role: 'switch.light',
+	},
+	{
+		channelId: 'mainLight',
+		path: ['light', 'main', 'brightness'],
+		channelNames: ['Light', 'Main light'],
+		stateId: 'brightness',
+		stateName: 'Brightness',
+		rawKey: 'brightness',
+		type: 'number',
+		role: 'level.dimmer',
+		unit: '%',
+	},
+	{
+		channelId: 'mainLight',
+		path: ['light', 'main', 'colorTemperature'],
+		channelNames: ['Light', 'Main light'],
+		stateId: 'colorTemperature',
+		stateName: 'Color temperature',
+		rawKey: 'colortemp',
+		type: 'number',
+		role: 'level.color.temperature',
+	},
+	{
+		channelId: 'display',
+		path: ['display', 'on'],
+		channelNames: ['Display'],
+		stateId: 'on',
+		stateName: 'Display',
+		rawKey: 'lighton',
+		type: 'boolean',
+		role: 'switch',
+	},
+	{
+		channelId: 'rgb',
+		path: ['light', 'atmosphere', 'on'],
+		channelNames: ['Light', 'Atmosphere light'],
+		stateId: 'on',
+		stateName: 'Atmosphere light',
+		rawKey: 'atmon',
+		type: 'boolean',
+		role: 'switch.light',
+	},
+	{
+		channelId: 'rgb',
+		path: ['light', 'atmosphere', 'brightness'],
+		channelNames: ['Light', 'Atmosphere light'],
+		stateId: 'brightness',
+		stateName: 'Brightness',
+		rawKey: 'atmbri',
+		type: 'number',
+		role: 'level.dimmer',
+		unit: '%',
+	},
+	{
+		channelId: 'rgb',
+		path: ['light', 'atmosphere', 'preset'],
+		channelNames: ['Light', 'Atmosphere light'],
+		stateId: 'preset',
+		stateName: 'Preset',
+		rawKey: 'rgbpresetsel',
+		type: 'number',
+		role: 'value',
+	},
+	{
+		channelId: 'settings',
+		path: ['settings', 'mute'],
+		channelNames: ['Settings'],
+		stateId: 'mute',
+		stateName: 'Mute',
+		rawKey: 'muteon',
+		type: 'boolean',
+		role: 'switch',
+	},
+	{
+		channelId: 'settings',
+		path: ['settings', 'childLock'],
+		channelNames: ['Settings'],
+		stateId: 'childLock',
+		stateName: 'Child lock',
+		rawKey: 'childlockon',
+		type: 'boolean',
+		role: 'switch.lock',
+	},
+	{
+		channelId: 'timer',
+		path: ['timer', 'on'],
+		channelNames: ['Timer'],
+		stateId: 'on',
+		stateName: 'Timer on',
+		rawKey: 'timeron',
+		type: 'number',
+		role: 'value',
+	},
+	{
+		channelId: 'timer',
+		path: ['timer', 'off'],
+		channelNames: ['Timer'],
+		stateId: 'off',
+		stateName: 'Timer off',
+		rawKey: 'timeroff',
+		type: 'number',
+		role: 'value',
+	},
+];
+
 class DreoCloud extends utils.Adapter {
 	private client?: DreoClient;
 
@@ -26,9 +200,9 @@ class DreoCloud extends utils.Adapter {
 
 	private readonly resolvedDevicesBySerialNumber = new Map<string, ResolvedDevice>();
 
-	private readonly runtimeRawStatesBySerialNumber = new Map<string, Map<string, DiscoveredState>>();
+	private readonly deviceInitializationPromises = new Map<string, Promise<void>>();
 
-	private readonly pendingDeviceDiscoveries = new Set<string>();
+	private readonly runtimeRawStatesBySerialNumber = new Map<string, Map<string, DiscoveredState>>();
 
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
 		super({
@@ -37,13 +211,10 @@ class DreoCloud extends utils.Adapter {
 		});
 
 		this.on('ready', this.onReady.bind(this));
+		this.on('stateChange', this.onStateChange.bind(this));
 		this.on('unload', this.onUnload.bind(this));
 	}
 
-	/**
-	 * Called when ioBroker databases are connected and the adapter
-	 * has received its configuration.
-	 */
 	private async onReady(): Promise<void> {
 		await this.setConnectionState(false);
 
@@ -62,66 +233,126 @@ class DreoCloud extends utils.Adapter {
 		}
 
 		this.log.info(`DREO cloud region configured: ${validation.config.region}.`);
-		this.log.info('Connecting to DREO cloud...');
 
 		try {
-			const client = await DreoClient.login({
-				email: validation.config.email,
-				password: validation.config.password,
-				region: validation.config.region,
-				logger: this.createDreoLogger(),
-			});
-
-			this.client = client;
-
+			await this.connectDreo(validation.config);
+			await this.initializeResolvedDevices();
 			await this.setConnectionState(true);
-			this.log.info('Connected to DREO cloud.');
-
-			await this.initializeResolvedDevices(client);
-			this.subscribeToDeviceStateChanges(client);
-			this.subscribeToDeviceDiscovery(client);
 		} catch (error) {
 			await this.setConnectionState(false);
 			this.log.error(`Failed to initialize DREO cloud connection: ${this.formatError(error)}`);
 		}
 	}
 
-	/**
-	 * Loads all FamilyTree-based devices and creates their basic ioBroker
-	 * device and information objects.
-	 *
-	 * Friendly states, write support and runtime discovery are intentionally
-	 * not initialized in this migration step. Existing RAW states are updated
-	 * later through the SDK WebSocket event stream.
-	 *
-	 * @param client Connected DREO client
-	 */
-	private async initializeResolvedDevices(client: DreoClient): Promise<void> {
-		const resolvedDevices = await client.getResolvedDevices();
+	private async connectDreo(config: { email: string; password: string; region: 'EU' | 'US' }): Promise<void> {
+		this.log.info('Connecting to DREO cloud...');
+
+		const client = await DreoClient.login({
+			email: config.email,
+			password: config.password,
+			region: config.region,
+			logger: this.createDreoLogger(),
+		});
+
+		this.client = client;
+
+		this.unsubscribeDeviceStateChanged = client.onDeviceStateChanged(event => {
+			void this.handleDeviceStateChanged(event).catch(error => {
+				this.log.warn(
+					`Failed to apply DREO live state update: ${error instanceof Error ? error.message : String(error)}`,
+				);
+			});
+		});
+
+		this.unsubscribeDeviceDiscovered = client.onDeviceDiscovered(event => {
+			void this.handleDeviceDiscovered(event).catch(error => {
+				this.log.warn(
+					`Failed to initialize discovered DREO device: ${
+						error instanceof Error ? error.message : String(error)
+					}`,
+				);
+			});
+		});
+
+		this.log.info('Connected to DREO cloud.');
+	}
+
+	private async handleDeviceDiscovered(event: DreoDeviceDiscoveredEvent): Promise<void> {
+		const serialNumber = event.resolvedDevice.device.sn;
+
+		if (this.resolvedDevicesBySerialNumber.has(serialNumber)) {
+			this.log.debug(`Ignoring duplicate runtime discovery event for ${serialNumber}.`);
+			return;
+		}
+
+		const existingInitialization = this.deviceInitializationPromises.get(serialNumber);
+
+		if (existingInitialization) {
+			this.log.debug(`Runtime discovery for ${serialNumber} is already being initialized.`);
+			await existingInitialization;
+			return;
+		}
+
+		this.log.info(
+			`Received runtime discovery event for ${event.resolvedDevice.device.deviceName} ` +
+				`(${event.resolvedDevice.device.model}, ${event.resolvedDevice.device.sn}).`,
+		);
+
+		await this.initializeResolvedDevice(event.resolvedDevice);
+
+		this.log.info(`Initialized discovered DREO device ${event.resolvedDevice.device.deviceName}.`);
+	}
+
+	private async initializeResolvedDevices(): Promise<void> {
+		if (!this.client) {
+			throw new Error('DREO client is not connected.');
+		}
+
+		const resolvedDevices = await this.client.getResolvedDevices();
 
 		this.resolvedDevicesBySerialNumber.clear();
 		this.runtimeRawStatesBySerialNumber.clear();
 
-		for (const resolvedDevice of resolvedDevices) {
-			this.resolvedDevicesBySerialNumber.set(resolvedDevice.device.sn, resolvedDevice);
-		}
-
 		this.log.info(`Resolved ${resolvedDevices.length} DREO device(s).`);
 
-		await this.createDevicesRootObject();
+		await Promise.all(resolvedDevices.map(resolvedDevice => this.initializeResolvedDevice(resolvedDevice)));
 
-		for (const resolvedDevice of resolvedDevices) {
-			this.log.info(this.formatResolvedDeviceLogMessage(resolvedDevice));
-			await this.createDeviceInfoObjects(resolvedDevice);
-			await this.createRawDeviceObjects(resolvedDevice);
-			await this.setDeviceInfoStates(resolvedDevice);
-			await this.setRawDeviceStates(resolvedDevice);
+		this.subscribeStates('devices.*');
+	}
+
+	private async initializeResolvedDevice(resolvedDevice: ResolvedDevice): Promise<void> {
+		const serialNumber = resolvedDevice.device.sn;
+		const existingInitialization = this.deviceInitializationPromises.get(serialNumber);
+
+		if (existingInitialization) {
+			await existingInitialization;
+			return;
+		}
+
+		const initialization = this.performResolvedDeviceInitialization(resolvedDevice);
+
+		this.deviceInitializationPromises.set(serialNumber, initialization);
+
+		try {
+			await initialization;
+		} finally {
+			this.deviceInitializationPromises.delete(serialNumber);
 		}
 	}
 
-	/**
-	 * Creates the root channel containing all DREO devices.
-	 */
+	private async performResolvedDeviceInitialization(resolvedDevice: ResolvedDevice): Promise<void> {
+		this.log.info(this.formatResolvedDeviceLogMessage(resolvedDevice));
+
+		await this.createDevicesRootObject();
+		await this.createDeviceObjects(resolvedDevice);
+		await this.createFriendlyDeviceObjects(resolvedDevice);
+		await this.setDeviceInfoStates(resolvedDevice);
+		await this.setRawDeviceStates(resolvedDevice);
+		await this.setFriendlyDeviceStates(resolvedDevice);
+
+		this.resolvedDevicesBySerialNumber.set(resolvedDevice.device.sn, resolvedDevice);
+	}
+
 	private async createDevicesRootObject(): Promise<void> {
 		await this.setObjectNotExistsAsync('devices', {
 			type: 'channel',
@@ -132,12 +363,7 @@ class DreoCloud extends utils.Adapter {
 		});
 	}
 
-	/**
-	 * Creates a device and its basic information states.
-	 *
-	 * @param resolvedDevice Device returned by the SDK
-	 */
-	private async createDeviceInfoObjects(resolvedDevice: ResolvedDevice): Promise<void> {
+	private async createDeviceObjects(resolvedDevice: ResolvedDevice): Promise<void> {
 		const deviceId = this.createDeviceObjectId(resolvedDevice);
 		const { device } = resolvedDevice;
 
@@ -156,6 +382,14 @@ class DreoCloud extends utils.Adapter {
 			type: 'channel',
 			common: {
 				name: 'Device information',
+			},
+			native: {},
+		});
+
+		await this.setObjectNotExistsAsync(`devices.${deviceId}.raw`, {
+			type: 'channel',
+			common: {
+				name: 'Raw device state',
 			},
 			native: {},
 		});
@@ -195,36 +429,12 @@ class DreoCloud extends utils.Adapter {
 			},
 			native: {},
 		});
-	}
-
-	/**
-	 * Creates the RAW channel and one read-only state object for every state
-	 * discovered by the SDK.
-	 *
-	 * @param resolvedDevice Device returned by the SDK
-	 */
-	private async createRawDeviceObjects(resolvedDevice: ResolvedDevice): Promise<void> {
-		const deviceId = this.createDeviceObjectId(resolvedDevice);
-
-		await this.setObjectNotExistsAsync(`devices.${deviceId}.raw`, {
-			type: 'channel',
-			common: {
-				name: 'Raw device state',
-			},
-			native: {},
-		});
 
 		for (const state of resolvedDevice.states) {
 			await this.createRawStateObject(deviceId, state);
 		}
 	}
 
-	/**
-	 * Creates one read-only RAW state object.
-	 *
-	 * @param deviceId Sanitized ioBroker device ID
-	 * @param state State discovered by the SDK
-	 */
 	private async createRawStateObject(deviceId: string, state: DiscoveredState): Promise<void> {
 		const stateId = this.createRawStateObjectId(state.key);
 
@@ -247,15 +457,7 @@ class DreoCloud extends utils.Adapter {
 		});
 	}
 
-	/**
-	 * Maps the SDK value type to an ioBroker state type.
-	 *
-	 * Object and unknown values are stored as JSON strings.
-	 *
-	 * @param state State discovered by the SDK
-	 * @returns ioBroker state type
-	 */
-	private mapRawStateType(state: DiscoveredState): 'boolean' | 'number' | 'string' {
+	private mapRawStateType(state: DiscoveredState): 'boolean' | 'number' | 'string' | 'mixed' {
 		switch (state.valueType) {
 			case 'boolean':
 				return 'boolean';
@@ -273,13 +475,11 @@ class DreoCloud extends utils.Adapter {
 		}
 	}
 
-	/**
-	 * Maps SDK state metadata to a conservative ioBroker role.
-	 *
-	 * @param state State discovered by the SDK
-	 * @returns ioBroker role
-	 */
 	private mapRawStateRole(state: DiscoveredState): string {
+		if (state.category === 'diagnostic') {
+			return 'value';
+		}
+
 		if (state.category === 'information') {
 			return 'info';
 		}
@@ -291,11 +491,196 @@ class DreoCloud extends utils.Adapter {
 		return 'value';
 	}
 
-	/**
-	 * Writes all currently available RAW values with acknowledgement.
-	 *
-	 * @param resolvedDevice Device returned by the SDK
-	 */
+	private async createFriendlyDeviceObjects(resolvedDevice: ResolvedDevice): Promise<void> {
+		const deviceId = this.createDeviceObjectId(resolvedDevice);
+		const definitions = this.getAvailableFriendlyStateDefinitions(resolvedDevice);
+		const createdChannelPaths = new Set<string>();
+
+		for (const definition of definitions) {
+			const channelPathParts = definition.path.slice(0, -1);
+
+			for (let channelIndex = 0; channelIndex < channelPathParts.length; channelIndex += 1) {
+				const relativeChannelPath = channelPathParts.slice(0, channelIndex + 1).join('.');
+
+				if (createdChannelPaths.has(relativeChannelPath)) {
+					continue;
+				}
+
+				const channelName = definition.channelNames[channelIndex] ?? channelPathParts[channelIndex];
+
+				await this.setObjectNotExistsAsync(`devices.${deviceId}.${relativeChannelPath}`, {
+					type: 'channel',
+					common: {
+						name: channelName,
+					},
+					native: {},
+				});
+
+				createdChannelPaths.add(relativeChannelPath);
+			}
+		}
+
+		for (const definition of definitions) {
+			await this.createFriendlyStateObject(resolvedDevice, deviceId, definition);
+		}
+	}
+
+	private async createFriendlyStateObject(
+		resolvedDevice: ResolvedDevice,
+		deviceId: string,
+		definition: FriendlyStateDefinition,
+	): Promise<void> {
+		const objectId = `devices.${deviceId}.${definition.path.join('.')}`;
+		const writable = this.isWritableFriendlyStateDefinition(definition);
+		const discoveredState = resolvedDevice.states.find(state => state.key === definition.rawKey);
+		const numberConstraint =
+			discoveredState?.constraint?.type === 'number' ? discoveredState.constraint : undefined;
+
+		await this.setObjectAsync(objectId, {
+			type: 'state',
+			common: {
+				name: definition.stateName,
+				type: definition.type,
+				role: definition.role,
+				read: true,
+				write: writable,
+				unit: definition.unit,
+				...(numberConstraint?.min !== undefined ? { min: numberConstraint.min } : {}),
+				...(numberConstraint?.max !== undefined ? { max: numberConstraint.max } : {}),
+				...(numberConstraint?.step !== undefined ? { step: numberConstraint.step } : {}),
+			},
+			native: {
+				rawKey: definition.rawKey,
+			},
+		});
+	}
+
+	private async setFriendlyDeviceStates(resolvedDevice: ResolvedDevice): Promise<void> {
+		const deviceId = this.createDeviceObjectId(resolvedDevice);
+		const definitions = this.getAvailableFriendlyStateDefinitions(resolvedDevice);
+
+		for (const definition of definitions) {
+			const rawValue = this.readRawStateValue(resolvedDevice, definition.rawKey);
+
+			if (rawValue === undefined) {
+				continue;
+			}
+
+			await this.setStateAsync(`devices.${deviceId}.${definition.path.join('.')}`, {
+				val: this.normalizeFriendlyStateValue(rawValue, definition, resolvedDevice),
+				ack: true,
+			});
+		}
+	}
+
+	private getAvailableFriendlyStateDefinitions(resolvedDevice: ResolvedDevice): FriendlyStateDefinition[] {
+		const availableRawKeys = new Set(resolvedDevice.states.map(state => state.key));
+
+		const hasMainLight =
+			availableRawKeys.has('lighton') && availableRawKeys.has('brightness') && availableRawKeys.has('colortemp');
+
+		const hasAmbientLight =
+			availableRawKeys.has('atmon') || availableRawKeys.has('atmbri') || availableRawKeys.has('rgbpresetsel');
+
+		const hasFan =
+			availableRawKeys.has('fanon') || availableRawKeys.has('windlevel') || availableRawKeys.has('oscmode');
+
+		return FRIENDLY_STATE_DEFINITIONS.filter(definition => {
+			if (!availableRawKeys.has(definition.rawKey)) {
+				return false;
+			}
+
+			if (definition.channelId === 'fan' && !hasFan) {
+				return false;
+			}
+
+			if (definition.channelId === 'mainLight') {
+				return hasMainLight;
+			}
+
+			if (definition.channelId === 'display') {
+				return definition.rawKey === 'lighton' && !hasMainLight;
+			}
+
+			if (definition.channelId === 'rgb') {
+				return hasAmbientLight;
+			}
+
+			return true;
+		});
+	}
+
+	private normalizeFriendlyStateValue(
+		value: unknown,
+		definition: FriendlyStateDefinition,
+		resolvedDevice: ResolvedDevice,
+	): string | number | boolean | null {
+		if (value === null) {
+			return null;
+		}
+
+		if (this.isPowerScopedFriendlyOnState(definition)) {
+			const powerValue = this.readRawStateValue(resolvedDevice, 'poweron');
+			const isPowered = typeof powerValue === 'boolean' ? powerValue : Boolean(powerValue);
+
+			const isTargetEnabled = typeof value === 'boolean' ? value : Boolean(value);
+
+			return isPowered && isTargetEnabled;
+		}
+
+		switch (definition.type) {
+			case 'boolean':
+				return typeof value === 'boolean' ? value : Boolean(value);
+
+			case 'number':
+				return typeof value === 'number' ? value : Number(value);
+
+			case 'string':
+			default:
+				return typeof value === 'string' ? value : this.stringifyRawStateValue(value);
+		}
+	}
+
+	private isPowerScopedFriendlyOnState(definition: FriendlyStateDefinition): boolean {
+		return definition.stateId === 'on' && ['fan', 'mainLight', 'display', 'rgb'].includes(definition.channelId);
+	}
+
+	private isWritableFriendlyStateDefinition(definition: FriendlyStateDefinition): boolean {
+		const writableStates = new Set<string>([
+			'power.on',
+			'fan.on',
+			'fan.speed',
+			'mainLight.on',
+			'mainLight.brightness',
+			'mainLight.colorTemperature',
+			'display.on',
+			'rgb.on',
+			'rgb.brightness',
+		]);
+
+		return writableStates.has(`${definition.channelId}.${definition.stateId}`);
+	}
+
+	private async setDeviceInfoStates(resolvedDevice: ResolvedDevice): Promise<void> {
+		const deviceId = this.createDeviceObjectId(resolvedDevice);
+		const { device } = resolvedDevice;
+
+		await this.setStateAsync(`devices.${deviceId}.info.name`, {
+			val: device.deviceName,
+			ack: true,
+		});
+
+		await this.setStateAsync(`devices.${deviceId}.info.model`, {
+			val: device.model,
+			ack: true,
+		});
+
+		await this.setStateAsync(`devices.${deviceId}.info.serialNumber`, {
+			val: device.sn,
+			ack: true,
+		});
+	}
+
 	private async setRawDeviceStates(resolvedDevice: ResolvedDevice): Promise<void> {
 		const deviceId = this.createDeviceObjectId(resolvedDevice);
 
@@ -313,13 +698,6 @@ class DreoCloud extends utils.Adapter {
 		}
 	}
 
-	/**
-	 * Reads the current value of a RAW key from the resolved device status.
-	 *
-	 * @param resolvedDevice Device returned by the SDK
-	 * @param key RAW state key
-	 * @returns Current value or undefined
-	 */
 	private readRawStateValue(resolvedDevice: ResolvedDevice, key: string): unknown {
 		const mixedState = resolvedDevice.state.data.mixed[key];
 
@@ -330,13 +708,6 @@ class DreoCloud extends utils.Adapter {
 		return mixedState.state;
 	}
 
-	/**
-	 * Normalizes a RAW value so it matches the ioBroker object type.
-	 *
-	 * @param value Current RAW value
-	 * @param state State metadata
-	 * @returns ioBroker-compatible value
-	 */
 	private normalizeRawStateValue(value: unknown, state: DiscoveredState): string | number | boolean | null {
 		if (value === null) {
 			return null;
@@ -359,93 +730,26 @@ class DreoCloud extends utils.Adapter {
 		}
 	}
 
-	/**
-	 * Serializes complex or unknown RAW values safely.
-	 *
-	 * @param value RAW value
-	 * @returns String representation
-	 */
 	private stringifyRawStateValue(value: unknown): string {
 		if (typeof value === 'string') {
 			return value;
 		}
 
-		if (value === null) {
-			return 'null';
-		}
-
-		if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
-			return `${value}`;
-		}
-
-		if (typeof value === 'undefined') {
-			return 'undefined';
-		}
-
-		if (typeof value === 'symbol') {
-			return value.description ?? 'symbol';
-		}
-
 		try {
-			const serializedValue = JSON.stringify(value);
-
-			return serializedValue ?? '[Unserializable RAW value]';
+			return JSON.stringify(value);
 		} catch {
-			return '[Unserializable RAW value]';
+			return String(value);
 		}
 	}
 
-	/**
-	 * Creates a stable RAW state ID.
-	 *
-	 * @param key Original DREO state key
-	 * @returns Sanitized RAW state ID
-	 */
-	private createRawStateObjectId(key: string): string {
-		return this.sanitizeObjectId(key);
-	}
-
-	/**
-	 * Writes the current FamilyTree device information to ioBroker.
-	 *
-	 * @param resolvedDevice Device returned by the SDK
-	 */
-	private async setDeviceInfoStates(resolvedDevice: ResolvedDevice): Promise<void> {
-		const deviceId = this.createDeviceObjectId(resolvedDevice);
-		const { device } = resolvedDevice;
-
-		await this.setStateAsync(`devices.${deviceId}.info.name`, {
-			val: device.deviceName,
-			ack: true,
-		});
-
-		await this.setStateAsync(`devices.${deviceId}.info.model`, {
-			val: device.model,
-			ack: true,
-		});
-
-		await this.setStateAsync(`devices.${deviceId}.info.serialNumber`, {
-			val: device.sn,
-			ack: true,
-		});
-	}
-
-	/**
-	 * Creates a stable ioBroker object ID from the DREO serial number.
-	 *
-	 * @param resolvedDevice Device returned by the SDK
-	 * @returns Sanitized device object ID
-	 */
 	private createDeviceObjectId(resolvedDevice: ResolvedDevice): string {
 		return this.sanitizeObjectId(resolvedDevice.device.sn);
 	}
 
-	/**
-	 * Sanitizes a DREO identifier for use as an ioBroker object ID segment.
-	 *
-	 * @param value Identifier to sanitize
-	 * @returns Sanitized identifier
-	 */
+	private createRawStateObjectId(key: string): string {
+		return this.sanitizeObjectId(key);
+	}
+
 	private sanitizeObjectId(value: string): string {
 		return value
 			.trim()
@@ -454,108 +758,19 @@ class DreoCloud extends utils.Adapter {
 			.replace(/^_+|_+$/g, '');
 	}
 
-	/**
-	 * Formats a resolved device for diagnostic startup logging.
-	 *
-	 * @param resolvedDevice Device returned by the SDK
-	 * @returns Human-readable device description
-	 */
 	private formatResolvedDeviceLogMessage(resolvedDevice: ResolvedDevice): string {
 		const { device } = resolvedDevice;
 
 		return `DREO device: ${device.deviceName} (${device.model}, ${device.sn})`;
 	}
 
-	/**
-	 * Subscribes to SDK runtime discovery events for newly appearing devices.
-	 *
-	 * @param client Connected DREO client
-	 */
-	private subscribeToDeviceDiscovery(client: DreoClient): void {
-		this.unsubscribeDeviceDiscovered = client.onDeviceDiscovered(event => {
-			void this.handleDeviceDiscovered(event).catch(error => {
-				this.log.warn(`Failed to initialize runtime-discovered DREO device: ${this.formatError(error)}`);
-			});
-		});
-
-		this.log.info('Subscribed to DREO runtime device discovery.');
-	}
-
-	/**
-	 * Creates all currently supported ioBroker structures for a device first
-	 * reported after adapter startup.
-	 *
-	 * Duplicate events are ignored. If initialization fails, the device is
-	 * removed from the local maps so a later event can retry cleanly.
-	 *
-	 * @param event Runtime device-discovery event from the SDK
-	 */
-	private async handleDeviceDiscovered(event: DreoDeviceDiscoveredEvent): Promise<void> {
-		const { resolvedDevice } = event;
-		const serialNumber = resolvedDevice.device.sn;
-
-		if (this.resolvedDevicesBySerialNumber.has(serialNumber)) {
-			this.log.debug(`Ignoring duplicate DREO runtime discovery for ${serialNumber}.`);
-			return;
-		}
-
-		if (this.pendingDeviceDiscoveries.has(serialNumber)) {
-			this.log.debug(`DREO runtime discovery for ${serialNumber} is already being initialized.`);
-			return;
-		}
-
-		this.pendingDeviceDiscoveries.add(serialNumber);
-		this.resolvedDevicesBySerialNumber.set(serialNumber, resolvedDevice);
-
-		try {
-			this.log.info(
-				`Discovered new DREO device at runtime: ${resolvedDevice.device.deviceName} ` +
-					`(${resolvedDevice.device.model}, ${serialNumber}).`,
-			);
-
-			await this.createDevicesRootObject();
-			await this.createDeviceInfoObjects(resolvedDevice);
-			await this.createRawDeviceObjects(resolvedDevice);
-			await this.setDeviceInfoStates(resolvedDevice);
-			await this.setRawDeviceStates(resolvedDevice);
-
-			this.log.info(`Initialized runtime-discovered DREO device ${resolvedDevice.device.deviceName}.`);
-		} catch (error) {
-			this.resolvedDevicesBySerialNumber.delete(serialNumber);
-			this.runtimeRawStatesBySerialNumber.delete(serialNumber);
-			throw error;
-		} finally {
-			this.pendingDeviceDiscoveries.delete(serialNumber);
-		}
-	}
-
-	/**
-	 * Subscribes to WebSocket-backed state changes from the SDK.
-	 *
-	 * Only devices and RAW keys already known from the startup discovery are
-	 * updated here. Runtime discovery remains a separate migration step.
-	 *
-	 * @param client Connected DREO client
-	 */
-	private subscribeToDeviceStateChanges(client: DreoClient): void {
-		this.unsubscribeDeviceStateChanged = client.onDeviceStateChanged(event => {
-			void this.handleDeviceStateChanged(event).catch(error => {
-				this.log.warn(`Failed to apply DREO live RAW update: ${this.formatError(error)}`);
-			});
-		});
-
-		this.log.info('Subscribed to DREO live state updates.');
-	}
-
-	/**
-	 * Applies one SDK WebSocket report to RAW ioBroker states.
-	 *
-	 * Previously unknown keys are created dynamically for already known
-	 * devices. Unknown devices remain a separate runtime-discovery step.
-	 *
-	 * @param event Device state-change event from the SDK
-	 */
 	private async handleDeviceStateChanged(event: DreoDeviceStateChangeEvent): Promise<void> {
+		const initialization = this.deviceInitializationPromises.get(event.device.sn);
+
+		if (initialization) {
+			await initialization;
+		}
+
 		const resolvedDevice = this.resolvedDevicesBySerialNumber.get(event.device.sn);
 
 		if (!resolvedDevice) {
@@ -563,33 +778,29 @@ class DreoCloud extends utils.Adapter {
 			return;
 		}
 
-		let updatedStateCount = 0;
 		let discoveredStateCount = 0;
 
 		for (const [key, value] of Object.entries(event.reported)) {
 			const existingState = this.findRawStateMetadata(resolvedDevice, key);
-			const discoveredState = existingState ?? (await this.createRuntimeRawState(resolvedDevice, key, value));
 
 			if (!existingState) {
+				await this.createRuntimeRawState(resolvedDevice, key, value);
 				discoveredStateCount += 1;
 			}
 
-			const mixedState = resolvedDevice.state.data.mixed[key];
+			const mixedStates = resolvedDevice.state.data.mixed as Record<string, { state: unknown }>;
+			const mixedState = mixedStates[key];
 
 			if (mixedState) {
 				mixedState.state = value;
+			} else {
+				mixedStates[key] = { state: value };
 			}
-
-			await this.setStateAsync(
-				`devices.${this.createDeviceObjectId(resolvedDevice)}.raw.${this.createRawStateObjectId(key)}`,
-				{
-					val: this.normalizeRawStateValue(value, discoveredState),
-					ack: true,
-				},
-			);
-
-			updatedStateCount += 1;
 		}
+
+		await this.setRawDeviceStates(resolvedDevice);
+		await this.setRuntimeRawDeviceStates(resolvedDevice);
+		await this.setFriendlyDeviceStates(resolvedDevice);
 
 		if (discoveredStateCount > 0) {
 			this.log.info(
@@ -597,20 +808,9 @@ class DreoCloud extends utils.Adapter {
 			);
 		}
 
-		if (updatedStateCount > 0) {
-			this.log.debug(
-				`Applied ${updatedStateCount} DREO live RAW update(s) for ${resolvedDevice.device.deviceName}.`,
-			);
-		}
+		this.log.debug(`Applied DREO live update for ${resolvedDevice.device.deviceName}.`);
 	}
 
-	/**
-	 * Finds startup-discovered or runtime-discovered metadata for one RAW key.
-	 *
-	 * @param resolvedDevice Known device
-	 * @param key Original DREO RAW key
-	 * @returns State metadata or undefined
-	 */
 	private findRawStateMetadata(resolvedDevice: ResolvedDevice, key: string): DiscoveredState | undefined {
 		const startupState = resolvedDevice.states.find(state => state.key === key);
 
@@ -621,31 +821,20 @@ class DreoCloud extends utils.Adapter {
 		return this.runtimeRawStatesBySerialNumber.get(resolvedDevice.device.sn)?.get(key);
 	}
 
-	/**
-	 * Creates conservative metadata and an ioBroker object for a RAW key first
-	 * observed through the WebSocket stream.
-	 *
-	 * Unknown states are always read-only. Their value type is inferred only
-	 * from the received value; no command semantics are guessed.
-	 *
-	 * @param resolvedDevice Known device
-	 * @param key Original DREO RAW key
-	 * @param value First observed value
-	 * @returns Runtime RAW state metadata
-	 */
 	private async createRuntimeRawState(
 		resolvedDevice: ResolvedDevice,
 		key: string,
 		value: unknown,
 	): Promise<DiscoveredState> {
+		const valueType = this.inferRawValueType(value);
 		const state = {
 			key,
 			description: key,
 			category: 'diagnostic',
 			known: false,
-			valueType: this.inferRawValueType(value),
+			valueType,
 			constraint: {
-				type: this.inferRawValueType(value),
+				type: valueType,
 			},
 		} as DiscoveredState;
 
@@ -657,21 +846,34 @@ class DreoCloud extends utils.Adapter {
 		}
 
 		statesByKey.set(key, state);
-
 		await this.createRawStateObject(this.createDeviceObjectId(resolvedDevice), state);
 
 		return state;
 	}
 
-	/**
-	 * Infers only the storage type of a newly observed RAW value.
-	 *
-	 * JSON-looking strings remain strings so the RAW representation stays
-	 * faithful to the value delivered by DREO.
-	 *
-	 * @param value First observed RAW value
-	 * @returns SDK-compatible value type
-	 */
+	private async setRuntimeRawDeviceStates(resolvedDevice: ResolvedDevice): Promise<void> {
+		const statesByKey = this.runtimeRawStatesBySerialNumber.get(resolvedDevice.device.sn);
+
+		if (!statesByKey) {
+			return;
+		}
+
+		const deviceId = this.createDeviceObjectId(resolvedDevice);
+
+		for (const state of statesByKey.values()) {
+			const rawValue = this.readRawStateValue(resolvedDevice, state.key);
+
+			if (rawValue === undefined) {
+				continue;
+			}
+
+			await this.setStateAsync(`devices.${deviceId}.raw.${this.createRawStateObjectId(state.key)}`, {
+				val: this.normalizeRawStateValue(rawValue, state),
+				ack: true,
+			});
+		}
+	}
+
 	private inferRawValueType(value: unknown): DiscoveredState['valueType'] {
 		switch (typeof value) {
 			case 'boolean':
@@ -691,11 +893,163 @@ class DreoCloud extends utils.Adapter {
 		}
 	}
 
-	/**
-	 * Creates the logger passed to the DREO SDK.
-	 *
-	 * @returns Logger forwarding SDK messages to ioBroker
-	 */
+	private async onStateChange(id: string, state: ioBroker.State | null | undefined): Promise<void> {
+		if (!state || state.ack) {
+			return;
+		}
+
+		const parsedStateId = this.parseFriendlyStateId(id);
+
+		if (!parsedStateId) {
+			return;
+		}
+
+		const resolvedDevice = this.findResolvedDeviceByObjectId(parsedStateId.deviceId);
+
+		if (!resolvedDevice || !this.client) {
+			return;
+		}
+
+		const device = this.client.getDevice(resolvedDevice.device.sn);
+
+		if (!device) {
+			this.log.warn(`Cannot write DREO state for ${resolvedDevice.device.deviceName}: device is not registered.`);
+			return;
+		}
+
+		try {
+			const writtenValue = await this.writeFriendlyState(
+				device,
+				parsedStateId.channelId,
+				parsedStateId.stateId,
+				state.val,
+			);
+
+			if (writtenValue === undefined) {
+				return;
+			}
+
+			this.log.info(
+				`Wrote DREO state ${parsedStateId.channelId}.${parsedStateId.stateId}=${writtenValue} for ${resolvedDevice.device.deviceName}.`,
+			);
+		} catch (error) {
+			this.log.warn(
+				`Failed to write DREO state ${parsedStateId.channelId}.${
+					parsedStateId.stateId
+				} for ${resolvedDevice.device.deviceName}: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+	}
+
+	private async writeFriendlyState(
+		device: DreoDevice,
+		channelId: string,
+		stateId: string,
+		value: ioBroker.StateValue,
+	): Promise<boolean | number | undefined> {
+		if (stateId === 'on') {
+			const booleanValue = Boolean(value);
+
+			switch (channelId) {
+				case 'power':
+					await device.setPower(booleanValue);
+					return booleanValue;
+
+				case 'fan':
+					await device.setFan(booleanValue);
+					return booleanValue;
+
+				case 'mainLight':
+				case 'display':
+					await device.setMainLight(booleanValue);
+					return booleanValue;
+
+				case 'rgb':
+					await device.setAtmosphereLight(booleanValue);
+					return booleanValue;
+
+				default:
+					return undefined;
+			}
+		}
+
+		const numberValue = this.normalizeWritableNumber(value);
+
+		if (numberValue === undefined) {
+			throw new Error(`Invalid numeric value: ${String(value)}`);
+		}
+
+		if (channelId === 'fan' && stateId === 'speed') {
+			await device.setWindLevel(numberValue);
+			return numberValue;
+		}
+
+		if (channelId === 'mainLight' && stateId === 'brightness') {
+			await device.setBrightness(numberValue);
+			return numberValue;
+		}
+
+		if (channelId === 'mainLight' && stateId === 'colorTemperature') {
+			await device.setColorTemperature(numberValue);
+			return numberValue;
+		}
+
+		if (channelId === 'rgb' && stateId === 'brightness') {
+			await device.setAtmosphereBrightness(numberValue);
+			return numberValue;
+		}
+
+		return undefined;
+	}
+
+	private normalizeWritableNumber(value: ioBroker.StateValue): number | undefined {
+		if (typeof value === 'number' && Number.isFinite(value)) {
+			return value;
+		}
+
+		if (typeof value === 'string' && value.trim().length > 0) {
+			const parsed = Number(value);
+
+			return Number.isFinite(parsed) ? parsed : undefined;
+		}
+
+		return undefined;
+	}
+
+	private parseFriendlyStateId(id: string): { deviceId: string; channelId: string; stateId: string } | undefined {
+		const namespacePrefix = `${this.namespace}.`;
+		const relativeId = id.startsWith(namespacePrefix) ? id.slice(namespacePrefix.length) : id;
+
+		const parts = relativeId.split('.');
+
+		if (parts.length < 4 || parts[0] !== 'devices') {
+			return undefined;
+		}
+
+		const deviceId = parts[1];
+		const friendlyPath = parts.slice(2).join('.');
+
+		const definition = FRIENDLY_STATE_DEFINITIONS.find(
+			candidate => candidate.path.join('.') === friendlyPath && this.isWritableFriendlyStateDefinition(candidate),
+		);
+
+		if (!definition) {
+			return undefined;
+		}
+
+		return {
+			deviceId,
+			channelId: definition.channelId,
+			stateId: definition.stateId,
+		};
+	}
+
+	private findResolvedDeviceByObjectId(deviceId: string): ResolvedDevice | undefined {
+		return Array.from(this.resolvedDevicesBySerialNumber.values()).find(
+			resolvedDevice => this.createDeviceObjectId(resolvedDevice) === deviceId,
+		);
+	}
+
 	private createDreoLogger(): DreoLogger {
 		return {
 			debug: (message, data) => {
@@ -713,13 +1067,6 @@ class DreoCloud extends utils.Adapter {
 		};
 	}
 
-	/**
-	 * Formats a message received from the DREO SDK.
-	 *
-	 * @param message SDK log message
-	 * @param data Optional SDK log data
-	 * @returns Formatted ioBroker log message
-	 */
 	private formatSdkLogMessage(message: string, data?: unknown): string {
 		if (data === undefined) {
 			return `[SDK] ${message}`;
@@ -728,12 +1075,6 @@ class DreoCloud extends utils.Adapter {
 		return `[SDK] ${message} ${this.stringifyLogData(data)}`;
 	}
 
-	/**
-	 * Safely serializes SDK log data.
-	 *
-	 * @param data Data to serialize
-	 * @returns Serialized representation
-	 */
 	private stringifyLogData(data: unknown): string {
 		try {
 			return JSON.stringify(data);
@@ -742,21 +1083,10 @@ class DreoCloud extends utils.Adapter {
 		}
 	}
 
-	/**
-	 * Converts an unknown error into a readable message.
-	 *
-	 * @param error Error value
-	 * @returns Readable error message
-	 */
 	private formatError(error: unknown): string {
 		return error instanceof Error ? error.message : String(error);
 	}
 
-	/**
-	 * Updates the standard ioBroker connection indicator.
-	 *
-	 * @param connected Current cloud connection state
-	 */
 	private async setConnectionState(connected: boolean): Promise<void> {
 		await this.setStateAsync('info.connection', {
 			val: connected,
@@ -764,11 +1094,6 @@ class DreoCloud extends utils.Adapter {
 		});
 	}
 
-	/**
-	 * Called when the adapter shuts down.
-	 *
-	 * @param callback Callback that must always be invoked
-	 */
 	private onUnload(callback: () => void): void {
 		try {
 			this.unsubscribeDeviceDiscovered?.();
@@ -776,12 +1101,12 @@ class DreoCloud extends utils.Adapter {
 
 			this.unsubscribeDeviceStateChanged?.();
 			this.unsubscribeDeviceStateChanged = undefined;
-			this.resolvedDevicesBySerialNumber.clear();
-			this.runtimeRawStatesBySerialNumber.clear();
-			this.pendingDeviceDiscoveries.clear();
 
 			this.client?.disconnect();
 			this.client = undefined;
+			this.deviceInitializationPromises.clear();
+			this.resolvedDevicesBySerialNumber.clear();
+			this.runtimeRawStatesBySerialNumber.clear();
 
 			void this.setConnectionState(false)
 				.catch(error => {

@@ -5,7 +5,7 @@ declare global {
 		interface AdapterConfig {
 			email: string;
 			password: string;
-			region: 'EU' | 'US' | 'CN';
+			region: 'EU' | 'US';
 		}
 	}
 }

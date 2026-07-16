@@ -1,5 +1,5 @@
 /** Supported DREO cloud regions. */
-export const DREO_REGIONS = ['EU', 'US', 'CN'] as const;
+export const DREO_REGIONS = ['EU', 'US'] as const;
 
 /** Supported DREO cloud region. */
 export type DreoRegion = (typeof DREO_REGIONS)[number];
