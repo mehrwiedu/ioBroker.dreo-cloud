@@ -22,6 +22,8 @@ class DreoCloud extends utils.Adapter {
 
 	private readonly resolvedDevicesBySerialNumber = new Map<string, ResolvedDevice>();
 
+	private readonly runtimeRawStatesBySerialNumber = new Map<string, Map<string, DiscoveredState>>();
+
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
 		super({
 			...options,
@@ -91,6 +93,7 @@ class DreoCloud extends utils.Adapter {
 		const resolvedDevices = await client.getResolvedDevices();
 
 		this.resolvedDevicesBySerialNumber.clear();
+		this.runtimeRawStatesBySerialNumber.clear();
 
 		for (const resolvedDevice of resolvedDevices) {
 			this.resolvedDevicesBySerialNumber.set(resolvedDevice.device.sn, resolvedDevice);
@@ -475,7 +478,10 @@ class DreoCloud extends utils.Adapter {
 	}
 
 	/**
-	 * Applies one SDK WebSocket report to existing RAW ioBroker states.
+	 * Applies one SDK WebSocket report to RAW ioBroker states.
+	 *
+	 * Previously unknown keys are created dynamically for already known
+	 * devices. Unknown devices remain a separate runtime-discovery step.
 	 *
 	 * @param event Device state-change event from the SDK
 	 */
@@ -488,19 +494,21 @@ class DreoCloud extends utils.Adapter {
 		}
 
 		let updatedStateCount = 0;
+		let discoveredStateCount = 0;
 
 		for (const [key, value] of Object.entries(event.reported)) {
-			const discoveredState = resolvedDevice.states.find(state => state.key === key);
-			const mixedState = resolvedDevice.state.data.mixed[key];
+			const existingState = this.findRawStateMetadata(resolvedDevice, key);
+			const discoveredState = existingState ?? (await this.createRuntimeRawState(resolvedDevice, key, value));
 
-			if (!discoveredState || !mixedState) {
-				this.log.debug(
-					`Ignoring not-yet-discovered DREO RAW key ${key} for ${resolvedDevice.device.deviceName}.`,
-				);
-				continue;
+			if (!existingState) {
+				discoveredStateCount += 1;
 			}
 
-			mixedState.state = value;
+			const mixedState = resolvedDevice.state.data.mixed[key];
+
+			if (mixedState) {
+				mixedState.state = value;
+			}
 
 			await this.setStateAsync(
 				`devices.${this.createDeviceObjectId(resolvedDevice)}.raw.${this.createRawStateObjectId(key)}`,
@@ -513,10 +521,103 @@ class DreoCloud extends utils.Adapter {
 			updatedStateCount += 1;
 		}
 
+		if (discoveredStateCount > 0) {
+			this.log.info(
+				`Discovered ${discoveredStateCount} new DREO RAW key(s) for ${resolvedDevice.device.deviceName}.`,
+			);
+		}
+
 		if (updatedStateCount > 0) {
 			this.log.debug(
 				`Applied ${updatedStateCount} DREO live RAW update(s) for ${resolvedDevice.device.deviceName}.`,
 			);
+		}
+	}
+
+	/**
+	 * Finds startup-discovered or runtime-discovered metadata for one RAW key.
+	 *
+	 * @param resolvedDevice Known device
+	 * @param key Original DREO RAW key
+	 * @returns State metadata or undefined
+	 */
+	private findRawStateMetadata(resolvedDevice: ResolvedDevice, key: string): DiscoveredState | undefined {
+		const startupState = resolvedDevice.states.find(state => state.key === key);
+
+		if (startupState) {
+			return startupState;
+		}
+
+		return this.runtimeRawStatesBySerialNumber.get(resolvedDevice.device.sn)?.get(key);
+	}
+
+	/**
+	 * Creates conservative metadata and an ioBroker object for a RAW key first
+	 * observed through the WebSocket stream.
+	 *
+	 * Unknown states are always read-only. Their value type is inferred only
+	 * from the received value; no command semantics are guessed.
+	 *
+	 * @param resolvedDevice Known device
+	 * @param key Original DREO RAW key
+	 * @param value First observed value
+	 * @returns Runtime RAW state metadata
+	 */
+	private async createRuntimeRawState(
+		resolvedDevice: ResolvedDevice,
+		key: string,
+		value: unknown,
+	): Promise<DiscoveredState> {
+		const state = {
+			key,
+			description: key,
+			category: 'diagnostic',
+			known: false,
+			valueType: this.inferRawValueType(value),
+			constraint: {
+				type: this.inferRawValueType(value),
+			},
+		} as DiscoveredState;
+
+		let statesByKey = this.runtimeRawStatesBySerialNumber.get(resolvedDevice.device.sn);
+
+		if (!statesByKey) {
+			statesByKey = new Map<string, DiscoveredState>();
+			this.runtimeRawStatesBySerialNumber.set(resolvedDevice.device.sn, statesByKey);
+		}
+
+		statesByKey.set(key, state);
+
+		await this.createRawStateObject(this.createDeviceObjectId(resolvedDevice), state);
+
+		return state;
+	}
+
+	/**
+	 * Infers only the storage type of a newly observed RAW value.
+	 *
+	 * JSON-looking strings remain strings so the RAW representation stays
+	 * faithful to the value delivered by DREO.
+	 *
+	 * @param value First observed RAW value
+	 * @returns SDK-compatible value type
+	 */
+	private inferRawValueType(value: unknown): DiscoveredState['valueType'] {
+		switch (typeof value) {
+			case 'boolean':
+				return 'boolean';
+
+			case 'number':
+				return 'number';
+
+			case 'string':
+				return 'string';
+
+			case 'object':
+				return value === null ? 'unknown' : 'object';
+
+			default:
+				return 'unknown';
 		}
 	}
 
@@ -603,6 +704,7 @@ class DreoCloud extends utils.Adapter {
 			this.unsubscribeDeviceStateChanged?.();
 			this.unsubscribeDeviceStateChanged = undefined;
 			this.resolvedDevicesBySerialNumber.clear();
+			this.runtimeRawStatesBySerialNumber.clear();
 
 			this.client?.disconnect();
 			this.client = undefined;
