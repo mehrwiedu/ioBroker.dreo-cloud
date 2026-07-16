@@ -3,7 +3,7 @@
  */
 
 import * as utils from '@iobroker/adapter-core';
-import { DreoClient, type DreoLogger, VERSION as dreoApiVersion } from '@mehrwiedu/dreo-api';
+import { DreoClient, type DreoLogger, type ResolvedDevice, VERSION as dreoApiVersion } from '@mehrwiedu/dreo-api';
 
 import { validateConfig } from './lib/config';
 
@@ -56,10 +56,41 @@ class DreoCloud extends utils.Adapter {
 
 			await this.setConnectionState(true);
 			this.log.info('Connected to DREO cloud.');
+
+			await this.logResolvedDevices(client);
 		} catch (error) {
 			await this.setConnectionState(false);
-			this.log.error(`Failed to connect to DREO cloud: ${this.formatError(error)}`);
+			this.log.error(`Failed to initialize DREO cloud connection: ${this.formatError(error)}`);
 		}
+	}
+
+	/**
+	 * Loads the resolved devices through the SDK and logs their FamilyTree data.
+	 *
+	 * No ioBroker device objects or states are created in this migration step.
+	 *
+	 * @param client Connected DREO client
+	 */
+	private async logResolvedDevices(client: DreoClient): Promise<void> {
+		const resolvedDevices = await client.getResolvedDevices();
+
+		this.log.info(`Resolved ${resolvedDevices.length} DREO device(s).`);
+
+		for (const resolvedDevice of resolvedDevices) {
+			this.log.info(this.formatResolvedDeviceLogMessage(resolvedDevice));
+		}
+	}
+
+	/**
+	 * Formats a resolved device for diagnostic startup logging.
+	 *
+	 * @param resolvedDevice Device returned by the SDK
+	 * @returns Human-readable device description
+	 */
+	private formatResolvedDeviceLogMessage(resolvedDevice: ResolvedDevice): string {
+		const { device } = resolvedDevice;
+
+		return `DREO device: ${device.deviceName} (${device.model}, ${device.sn})`;
 	}
 
 	/**
