@@ -57,7 +57,7 @@ class DreoCloud extends utils.Adapter {
 			await this.setConnectionState(true);
 			this.log.info('Connected to DREO cloud.');
 
-			await this.logResolvedDevices(client);
+			await this.initializeResolvedDevices(client);
 		} catch (error) {
 			await this.setConnectionState(false);
 			this.log.error(`Failed to initialize DREO cloud connection: ${this.formatError(error)}`);
@@ -65,20 +65,153 @@ class DreoCloud extends utils.Adapter {
 	}
 
 	/**
-	 * Loads the resolved devices through the SDK and logs their FamilyTree data.
+	 * Loads all FamilyTree-based devices and creates their basic ioBroker
+	 * device and information objects.
 	 *
-	 * No ioBroker device objects or states are created in this migration step.
+	 * RAW states, friendly states and runtime discovery are intentionally
+	 * not initialized in this migration step.
 	 *
 	 * @param client Connected DREO client
 	 */
-	private async logResolvedDevices(client: DreoClient): Promise<void> {
+	private async initializeResolvedDevices(client: DreoClient): Promise<void> {
 		const resolvedDevices = await client.getResolvedDevices();
 
 		this.log.info(`Resolved ${resolvedDevices.length} DREO device(s).`);
 
+		await this.createDevicesRootObject();
+
 		for (const resolvedDevice of resolvedDevices) {
 			this.log.info(this.formatResolvedDeviceLogMessage(resolvedDevice));
+			await this.createDeviceInfoObjects(resolvedDevice);
+			await this.setDeviceInfoStates(resolvedDevice);
 		}
+	}
+
+	/**
+	 * Creates the root channel containing all DREO devices.
+	 */
+	private async createDevicesRootObject(): Promise<void> {
+		await this.setObjectNotExistsAsync('devices', {
+			type: 'channel',
+			common: {
+				name: 'DREO devices',
+			},
+			native: {},
+		});
+	}
+
+	/**
+	 * Creates a device and its basic information states.
+	 *
+	 * @param resolvedDevice Device returned by the SDK
+	 */
+	private async createDeviceInfoObjects(resolvedDevice: ResolvedDevice): Promise<void> {
+		const deviceId = this.createDeviceObjectId(resolvedDevice);
+		const { device } = resolvedDevice;
+
+		await this.setObjectNotExistsAsync(`devices.${deviceId}`, {
+			type: 'device',
+			common: {
+				name: device.deviceName,
+			},
+			native: {
+				sn: device.sn,
+				model: device.model,
+			},
+		});
+
+		await this.setObjectNotExistsAsync(`devices.${deviceId}.info`, {
+			type: 'channel',
+			common: {
+				name: 'Device information',
+			},
+			native: {},
+		});
+
+		await this.setObjectNotExistsAsync(`devices.${deviceId}.info.name`, {
+			type: 'state',
+			common: {
+				name: 'Name',
+				type: 'string',
+				role: 'info.name',
+				read: true,
+				write: false,
+			},
+			native: {},
+		});
+
+		await this.setObjectNotExistsAsync(`devices.${deviceId}.info.model`, {
+			type: 'state',
+			common: {
+				name: 'Model',
+				type: 'string',
+				role: 'info.model',
+				read: true,
+				write: false,
+			},
+			native: {},
+		});
+
+		await this.setObjectNotExistsAsync(`devices.${deviceId}.info.serialNumber`, {
+			type: 'state',
+			common: {
+				name: 'Serial number',
+				type: 'string',
+				role: 'info.serial',
+				read: true,
+				write: false,
+			},
+			native: {},
+		});
+	}
+
+	/**
+	 * Writes the current FamilyTree device information to ioBroker.
+	 *
+	 * @param resolvedDevice Device returned by the SDK
+	 */
+	private async setDeviceInfoStates(resolvedDevice: ResolvedDevice): Promise<void> {
+		const deviceId = this.createDeviceObjectId(resolvedDevice);
+		const { device } = resolvedDevice;
+
+		await this.setStateAsync(`devices.${deviceId}.info.name`, {
+			val: device.deviceName,
+			ack: true,
+		});
+
+		await this.setStateAsync(`devices.${deviceId}.info.model`, {
+			val: device.model,
+			ack: true,
+		});
+
+		await this.setStateAsync(`devices.${deviceId}.info.serialNumber`, {
+			val: device.sn,
+			ack: true,
+		});
+	}
+
+	/**
+	 * Creates a stable ioBroker object ID from the DREO serial number.
+	 *
+	 * @param resolvedDevice Device returned by the SDK
+	 * @returns Sanitized device object ID
+	 */
+	private createDeviceObjectId(resolvedDevice: ResolvedDevice): string {
+		return this.sanitizeObjectId(resolvedDevice.device.sn);
+	}
+
+	/**
+	 * Sanitizes a DREO identifier for use as an ioBroker object ID segment.
+	 *
+	 * @param value Identifier to sanitize
+	 * @returns Sanitized identifier
+	 */
+	private sanitizeObjectId(value: string): string {
+		return value
+			.trim()
+			.replace(/[^a-zA-Z0-9_-]/g, '_')
+			.replace(/_+/g, '_')
+			.replace(/^_+|_+$/g, '');
 	}
 
 	/**
