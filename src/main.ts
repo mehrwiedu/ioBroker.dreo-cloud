@@ -6,6 +6,8 @@ import * as utils from '@iobroker/adapter-core';
 import {
 	DreoClient,
 	type DiscoveredState,
+	type DreoDeviceStateChangeEvent,
+	type DreoDeviceStateChangeUnsubscribe,
 	type DreoLogger,
 	type ResolvedDevice,
 	VERSION as dreoApiVersion,
@@ -15,6 +17,10 @@ import { validateConfig } from './lib/config';
 
 class DreoCloud extends utils.Adapter {
 	private client?: DreoClient;
+
+	private unsubscribeDeviceStateChanged?: DreoDeviceStateChangeUnsubscribe;
+
+	private readonly resolvedDevicesBySerialNumber = new Map<string, ResolvedDevice>();
 
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
 		super({
@@ -64,6 +70,7 @@ class DreoCloud extends utils.Adapter {
 			this.log.info('Connected to DREO cloud.');
 
 			await this.initializeResolvedDevices(client);
+			this.subscribeToDeviceStateChanges(client);
 		} catch (error) {
 			await this.setConnectionState(false);
 			this.log.error(`Failed to initialize DREO cloud connection: ${this.formatError(error)}`);
@@ -75,12 +82,19 @@ class DreoCloud extends utils.Adapter {
 	 * device and information objects.
 	 *
 	 * Friendly states, write support and runtime discovery are intentionally
-	 * not initialized in this migration step.
+	 * not initialized in this migration step. Existing RAW states are updated
+	 * later through the SDK WebSocket event stream.
 	 *
 	 * @param client Connected DREO client
 	 */
 	private async initializeResolvedDevices(client: DreoClient): Promise<void> {
 		const resolvedDevices = await client.getResolvedDevices();
+
+		this.resolvedDevicesBySerialNumber.clear();
+
+		for (const resolvedDevice of resolvedDevices) {
+			this.resolvedDevicesBySerialNumber.set(resolvedDevice.device.sn, resolvedDevice);
+		}
 
 		this.log.info(`Resolved ${resolvedDevices.length} DREO device(s).`);
 
@@ -443,6 +457,70 @@ class DreoCloud extends utils.Adapter {
 	}
 
 	/**
+	 * Subscribes to WebSocket-backed state changes from the SDK.
+	 *
+	 * Only devices and RAW keys already known from the startup discovery are
+	 * updated here. Runtime discovery remains a separate migration step.
+	 *
+	 * @param client Connected DREO client
+	 */
+	private subscribeToDeviceStateChanges(client: DreoClient): void {
+		this.unsubscribeDeviceStateChanged = client.onDeviceStateChanged(event => {
+			void this.handleDeviceStateChanged(event).catch(error => {
+				this.log.warn(`Failed to apply DREO live RAW update: ${this.formatError(error)}`);
+			});
+		});
+
+		this.log.info('Subscribed to DREO live state updates.');
+	}
+
+	/**
+	 * Applies one SDK WebSocket report to existing RAW ioBroker states.
+	 *
+	 * @param event Device state-change event from the SDK
+	 */
+	private async handleDeviceStateChanged(event: DreoDeviceStateChangeEvent): Promise<void> {
+		const resolvedDevice = this.resolvedDevicesBySerialNumber.get(event.device.sn);
+
+		if (!resolvedDevice) {
+			this.log.debug(`Received DREO live update for unknown device ${event.device.sn}.`);
+			return;
+		}
+
+		let updatedStateCount = 0;
+
+		for (const [key, value] of Object.entries(event.reported)) {
+			const discoveredState = resolvedDevice.states.find(state => state.key === key);
+			const mixedState = resolvedDevice.state.data.mixed[key];
+
+			if (!discoveredState || !mixedState) {
+				this.log.debug(
+					`Ignoring not-yet-discovered DREO RAW key ${key} for ${resolvedDevice.device.deviceName}.`,
+				);
+				continue;
+			}
+
+			mixedState.state = value;
+
+			await this.setStateAsync(
+				`devices.${this.createDeviceObjectId(resolvedDevice)}.raw.${this.createRawStateObjectId(key)}`,
+				{
+					val: this.normalizeRawStateValue(value, discoveredState),
+					ack: true,
+				},
+			);
+
+			updatedStateCount += 1;
+		}
+
+		if (updatedStateCount > 0) {
+			this.log.debug(
+				`Applied ${updatedStateCount} DREO live RAW update(s) for ${resolvedDevice.device.deviceName}.`,
+			);
+		}
+	}
+
+	/**
 	 * Creates the logger passed to the DREO SDK.
 	 *
 	 * @returns Logger forwarding SDK messages to ioBroker
@@ -522,6 +600,10 @@ class DreoCloud extends utils.Adapter {
 	 */
 	private onUnload(callback: () => void): void {
 		try {
+			this.unsubscribeDeviceStateChanged?.();
+			this.unsubscribeDeviceStateChanged = undefined;
+			this.resolvedDevicesBySerialNumber.clear();
+
 			this.client?.disconnect();
 			this.client = undefined;
 
