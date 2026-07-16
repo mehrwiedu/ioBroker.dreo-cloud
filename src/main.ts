@@ -3,7 +3,13 @@
  */
 
 import * as utils from '@iobroker/adapter-core';
-import { DreoClient, type DreoLogger, type ResolvedDevice, VERSION as dreoApiVersion } from '@mehrwiedu/dreo-api';
+import {
+	DreoClient,
+	type DiscoveredState,
+	type DreoLogger,
+	type ResolvedDevice,
+	VERSION as dreoApiVersion,
+} from '@mehrwiedu/dreo-api';
 
 import { validateConfig } from './lib/config';
 
@@ -68,7 +74,7 @@ class DreoCloud extends utils.Adapter {
 	 * Loads all FamilyTree-based devices and creates their basic ioBroker
 	 * device and information objects.
 	 *
-	 * RAW states, friendly states and runtime discovery are intentionally
+	 * Friendly states, write support and runtime discovery are intentionally
 	 * not initialized in this migration step.
 	 *
 	 * @param client Connected DREO client
@@ -83,7 +89,9 @@ class DreoCloud extends utils.Adapter {
 		for (const resolvedDevice of resolvedDevices) {
 			this.log.info(this.formatResolvedDeviceLogMessage(resolvedDevice));
 			await this.createDeviceInfoObjects(resolvedDevice);
+			await this.createRawDeviceObjects(resolvedDevice);
 			await this.setDeviceInfoStates(resolvedDevice);
+			await this.setRawDeviceStates(resolvedDevice);
 		}
 	}
 
@@ -163,6 +171,214 @@ class DreoCloud extends utils.Adapter {
 			},
 			native: {},
 		});
+	}
+
+	/**
+	 * Creates the RAW channel and one read-only state object for every state
+	 * discovered by the SDK.
+	 *
+	 * @param resolvedDevice Device returned by the SDK
+	 */
+	private async createRawDeviceObjects(resolvedDevice: ResolvedDevice): Promise<void> {
+		const deviceId = this.createDeviceObjectId(resolvedDevice);
+
+		await this.setObjectNotExistsAsync(`devices.${deviceId}.raw`, {
+			type: 'channel',
+			common: {
+				name: 'Raw device state',
+			},
+			native: {},
+		});
+
+		for (const state of resolvedDevice.states) {
+			await this.createRawStateObject(deviceId, state);
+		}
+	}
+
+	/**
+	 * Creates one read-only RAW state object.
+	 *
+	 * @param deviceId Sanitized ioBroker device ID
+	 * @param state State discovered by the SDK
+	 */
+	private async createRawStateObject(deviceId: string, state: DiscoveredState): Promise<void> {
+		const stateId = this.createRawStateObjectId(state.key);
+
+		await this.setObjectNotExistsAsync(`devices.${deviceId}.raw.${stateId}`, {
+			type: 'state',
+			common: {
+				name: state.description,
+				type: this.mapRawStateType(state),
+				role: this.mapRawStateRole(state),
+				read: true,
+				write: false,
+			},
+			native: {
+				key: state.key,
+				category: state.category,
+				known: state.known,
+				valueType: state.valueType,
+				constraint: state.constraint,
+			},
+		});
+	}
+
+	/**
+	 * Maps the SDK value type to an ioBroker state type.
+	 *
+	 * Object and unknown values are stored as JSON strings.
+	 *
+	 * @param state State discovered by the SDK
+	 * @returns ioBroker state type
+	 */
+	private mapRawStateType(state: DiscoveredState): 'boolean' | 'number' | 'string' {
+		switch (state.valueType) {
+			case 'boolean':
+				return 'boolean';
+
+			case 'number':
+				return 'number';
+
+			case 'string':
+				return 'string';
+
+			case 'object':
+			case 'unknown':
+			default:
+				return 'string';
+		}
+	}
+
+	/**
+	 * Maps SDK state metadata to a conservative ioBroker role.
+	 *
+	 * @param state State discovered by the SDK
+	 * @returns ioBroker role
+	 */
+	private mapRawStateRole(state: DiscoveredState): string {
+		if (state.category === 'information') {
+			return 'info';
+		}
+
+		if (state.valueType === 'boolean') {
+			return 'indicator';
+		}
+
+		return 'value';
+	}
+
+	/**
+	 * Writes all currently available RAW values with acknowledgement.
+	 *
+	 * @param resolvedDevice Device returned by the SDK
+	 */
+	private async setRawDeviceStates(resolvedDevice: ResolvedDevice): Promise<void> {
+		const deviceId = this.createDeviceObjectId(resolvedDevice);
+
+		for (const state of resolvedDevice.states) {
+			const rawValue = this.readRawStateValue(resolvedDevice, state.key);
+
+			if (rawValue === undefined) {
+				continue;
+			}
+
+			await this.setStateAsync(`devices.${deviceId}.raw.${this.createRawStateObjectId(state.key)}`, {
+				val: this.normalizeRawStateValue(rawValue, state),
+				ack: true,
+			});
+		}
+	}
+
+	/**
+	 * Reads the current value of a RAW key from the resolved device status.
+	 *
+	 * @param resolvedDevice Device returned by the SDK
+	 * @param key RAW state key
+	 * @returns Current value or undefined
+	 */
+	private readRawStateValue(resolvedDevice: ResolvedDevice, key: string): unknown {
+		const mixedState = resolvedDevice.state.data.mixed[key];
+
+		if (!mixedState) {
+			return undefined;
+		}
+
+		return mixedState.state;
+	}
+
+	/**
+	 * Normalizes a RAW value so it matches the ioBroker object type.
+	 *
+	 * @param value Current RAW value
+	 * @param state State metadata
+	 * @returns ioBroker-compatible value
+	 */
+	private normalizeRawStateValue(value: unknown, state: DiscoveredState): string | number | boolean | null {
+		if (value === null) {
+			return null;
+		}
+
+		switch (state.valueType) {
+			case 'boolean':
+				return typeof value === 'boolean' ? value : Boolean(value);
+
+			case 'number':
+				return typeof value === 'number' ? value : Number(value);
+
+			case 'string':
+				return typeof value === 'string' ? value : this.stringifyRawStateValue(value);
+
+			case 'object':
+			case 'unknown':
+			default:
+				return this.stringifyRawStateValue(value);
+		}
+	}
+
+	/**
+	 * Serializes complex or unknown RAW values safely.
+	 *
+	 * @param value RAW value
+	 * @returns String representation
+	 */
+	private stringifyRawStateValue(value: unknown): string {
+		if (typeof value === 'string') {
+			return value;
+		}
+
+		if (value === null) {
+			return 'null';
+		}
+
+		if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+			return `${value}`;
+		}
+
+		if (typeof value === 'undefined') {
+			return 'undefined';
+		}
+
+		if (typeof value === 'symbol') {
+			return value.description ?? 'symbol';
+		}
+
+		try {
+			const serializedValue = JSON.stringify(value);
+
+			return serializedValue ?? '[Unserializable RAW value]';
+		} catch {
+			return '[Unserializable RAW value]';
+		}
+	}
+
+	/**
+	 * Creates a stable RAW state ID.
+	 *
+	 * @param key Original DREO state key
+	 * @returns Sanitized RAW state ID
+	 */
+	private createRawStateObjectId(key: string): string {
+		return this.sanitizeObjectId(key);
 	}
 
 	/**
