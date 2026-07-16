@@ -1,0 +1,106 @@
+{
+	"common": {
+		"name": "dreo-cloud",
+		"version": "0.0.1",
+		"news": {
+			"0.0.1": {
+				"en": "initial release",
+				"de": "Erstveröffentlichung",
+				"ru": "Начальная версия",
+				"pt": "lançamento inicial",
+				"nl": "Eerste uitgave",
+				"fr": "Première version",
+				"it": "Versione iniziale",
+				"es": "Versión inicial",
+				"pl": "Pierwsze wydanie",
+				"uk": "Початкова версія",
+				"zh-cn": "首次出版"
+			}
+		},
+		"titleLang": {
+			"en": "DREO Cloud",
+			"de": "DREO Cloud",
+			"ru": "ДРЕО Облако",
+			"pt": "Nuvem DREO",
+			"nl": "DREO-wolk",
+			"fr": "DREO Nuage",
+			"it": "DREO Nuvola",
+			"es": "Nube DREO",
+			"pl": "Chmura DREO",
+			"uk": "Хмара DREO",
+			"zh-cn": "德瑞云"
+		},
+		"desc": {
+			"en": "Control and monitor DREO cloud-connected smart home devices.",
+			"de": "Steuern und überwachen Sie mit der Cloud verbundene Smart-Home-Geräte von DREO.",
+			"ru": "Управляйте и контролируйте устройства умного дома, подключенные к облаку DREO.",
+			"pt": "Controle e monitore dispositivos domésticos inteligentes DREO conectados à nuvem.",
+			"nl": "Bedien en bewaak DREO-cloud-aangesloten smart home-apparaten.",
+			"fr": "Contrôlez et surveillez les appareils domestiques intelligents connectés au cloud DREO.",
+			"it": "Controlla e monitora i dispositivi domestici intelligenti connessi al cloud DREO.",
+			"es": "Controle y supervise los dispositivos domésticos inteligentes DREO conectados a la nube.",
+			"pl": "Kontroluj i monitoruj inteligentne urządzenia domowe DREO połączone z chmurą.",
+			"uk": "Контролюйте та контролюйте підключені до хмари пристрої розумного дому DREO.",
+			"zh-cn": "控制和监控 DREO 云连接的智能家居设备。"
+		},
+		"authors": ["mehrwiedu <david@vonderhoeh.net>"],
+		"keywords": ["dreo", "fan", "ceiling fan", "humidifier", "air purifier", "smart home", "cloud"],
+		"licenseInformation": {
+			"type": "free",
+			"license": "MIT"
+		},
+		"platform": "Javascript/Node.js",
+		"icon": "dreo-cloud.png",
+		"enabled": true,
+		"extIcon": "https://raw.githubusercontent.com/mehrwiedu/ioBroker.dreo-cloud/main/admin/dreo-cloud.png",
+		"readme": "https://github.com/mehrwiedu/ioBroker.dreo-cloud/blob/main/README.md",
+		"loglevel": "info",
+		"tier": 3,
+		"mode": "daemon",
+		"type": "climate-control",
+		"compact": true,
+		"connectionType": "cloud",
+		"dataSource": "push",
+		"adminUI": {
+			"config": "json"
+		},
+		"dependencies": [
+			{
+				"js-controller": ">=6.0.11"
+			}
+		],
+		"globalDependencies": [
+			{
+				"admin": ">=7.0.23"
+			}
+		]
+	},
+	"native": {
+		"option1": true,
+		"option2": "42"
+	},
+	"objects": [],
+	"instanceObjects": [
+		{
+			"_id": "info",
+			"type": "channel",
+			"common": {
+				"name": "Information"
+			},
+			"native": {}
+		},
+		{
+			"_id": "info.connection",
+			"type": "state",
+			"common": {
+				"role": "indicator.connected",
+				"name": "Device or service connected",
+				"type": "boolean",
+				"read": true,
+				"write": false,
+				"def": false
+			},
+			"native": {}
+		}
+	]
+}
