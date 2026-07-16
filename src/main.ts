@@ -6,6 +6,8 @@ import * as utils from '@iobroker/adapter-core';
 import {
 	DreoClient,
 	type DiscoveredState,
+	type DreoDeviceDiscoveredEvent,
+	type DreoDeviceDiscoveredUnsubscribe,
 	type DreoDeviceStateChangeEvent,
 	type DreoDeviceStateChangeUnsubscribe,
 	type DreoLogger,
@@ -20,9 +22,13 @@ class DreoCloud extends utils.Adapter {
 
 	private unsubscribeDeviceStateChanged?: DreoDeviceStateChangeUnsubscribe;
 
+	private unsubscribeDeviceDiscovered?: DreoDeviceDiscoveredUnsubscribe;
+
 	private readonly resolvedDevicesBySerialNumber = new Map<string, ResolvedDevice>();
 
 	private readonly runtimeRawStatesBySerialNumber = new Map<string, Map<string, DiscoveredState>>();
+
+	private readonly pendingDeviceDiscoveries = new Set<string>();
 
 	public constructor(options: Partial<utils.AdapterOptions> = {}) {
 		super({
@@ -73,6 +79,7 @@ class DreoCloud extends utils.Adapter {
 
 			await this.initializeResolvedDevices(client);
 			this.subscribeToDeviceStateChanges(client);
+			this.subscribeToDeviceDiscovery(client);
 		} catch (error) {
 			await this.setConnectionState(false);
 			this.log.error(`Failed to initialize DREO cloud connection: ${this.formatError(error)}`);
@@ -460,6 +467,69 @@ class DreoCloud extends utils.Adapter {
 	}
 
 	/**
+	 * Subscribes to SDK runtime discovery events for newly appearing devices.
+	 *
+	 * @param client Connected DREO client
+	 */
+	private subscribeToDeviceDiscovery(client: DreoClient): void {
+		this.unsubscribeDeviceDiscovered = client.onDeviceDiscovered(event => {
+			void this.handleDeviceDiscovered(event).catch(error => {
+				this.log.warn(`Failed to initialize runtime-discovered DREO device: ${this.formatError(error)}`);
+			});
+		});
+
+		this.log.info('Subscribed to DREO runtime device discovery.');
+	}
+
+	/**
+	 * Creates all currently supported ioBroker structures for a device first
+	 * reported after adapter startup.
+	 *
+	 * Duplicate events are ignored. If initialization fails, the device is
+	 * removed from the local maps so a later event can retry cleanly.
+	 *
+	 * @param event Runtime device-discovery event from the SDK
+	 */
+	private async handleDeviceDiscovered(event: DreoDeviceDiscoveredEvent): Promise<void> {
+		const { resolvedDevice } = event;
+		const serialNumber = resolvedDevice.device.sn;
+
+		if (this.resolvedDevicesBySerialNumber.has(serialNumber)) {
+			this.log.debug(`Ignoring duplicate DREO runtime discovery for ${serialNumber}.`);
+			return;
+		}
+
+		if (this.pendingDeviceDiscoveries.has(serialNumber)) {
+			this.log.debug(`DREO runtime discovery for ${serialNumber} is already being initialized.`);
+			return;
+		}
+
+		this.pendingDeviceDiscoveries.add(serialNumber);
+		this.resolvedDevicesBySerialNumber.set(serialNumber, resolvedDevice);
+
+		try {
+			this.log.info(
+				`Discovered new DREO device at runtime: ${resolvedDevice.device.deviceName} ` +
+					`(${resolvedDevice.device.model}, ${serialNumber}).`,
+			);
+
+			await this.createDevicesRootObject();
+			await this.createDeviceInfoObjects(resolvedDevice);
+			await this.createRawDeviceObjects(resolvedDevice);
+			await this.setDeviceInfoStates(resolvedDevice);
+			await this.setRawDeviceStates(resolvedDevice);
+
+			this.log.info(`Initialized runtime-discovered DREO device ${resolvedDevice.device.deviceName}.`);
+		} catch (error) {
+			this.resolvedDevicesBySerialNumber.delete(serialNumber);
+			this.runtimeRawStatesBySerialNumber.delete(serialNumber);
+			throw error;
+		} finally {
+			this.pendingDeviceDiscoveries.delete(serialNumber);
+		}
+	}
+
+	/**
 	 * Subscribes to WebSocket-backed state changes from the SDK.
 	 *
 	 * Only devices and RAW keys already known from the startup discovery are
@@ -701,10 +771,14 @@ class DreoCloud extends utils.Adapter {
 	 */
 	private onUnload(callback: () => void): void {
 		try {
+			this.unsubscribeDeviceDiscovered?.();
+			this.unsubscribeDeviceDiscovered = undefined;
+
 			this.unsubscribeDeviceStateChanged?.();
 			this.unsubscribeDeviceStateChanged = undefined;
 			this.resolvedDevicesBySerialNumber.clear();
 			this.runtimeRawStatesBySerialNumber.clear();
+			this.pendingDeviceDiscoveries.clear();
 
 			this.client?.disconnect();
 			this.client = undefined;
