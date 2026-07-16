@@ -2,20 +2,51 @@
 	"i18n": true,
 	"type": "panel",
 	"items": {
-		"option1": {
-			"type": "checkbox",
-			"label": "option1",
+		"email": {
+			"type": "text",
+			"label": "email",
+			"help": "email_help",
+			"required": true,
 			"newLine": true,
 			"xs": 12,
 			"sm": 12,
 			"md": 6,
-			"lg": 4,
-			"xl": 4
+			"lg": 6,
+			"xl": 6
 		},
-		"option2": {
-			"type": "text",
-			"label": "option2",
+		"password": {
+			"type": "password",
+			"label": "password",
+			"help": "password_help",
+			"required": true,
 			"newLine": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 6,
+			"xl": 6
+		},
+		"region": {
+			"type": "select",
+			"label": "region",
+			"help": "region_help",
+			"required": true,
+			"newLine": true,
+			"default": "EU",
+			"options": [
+				{
+					"label": "EU",
+					"value": "EU"
+				},
+				{
+					"label": "US",
+					"value": "US"
+				},
+				{
+					"label": "CN",
+					"value": "CN"
+				}
+			],
 			"xs": 12,
 			"sm": 12,
 			"md": 6,

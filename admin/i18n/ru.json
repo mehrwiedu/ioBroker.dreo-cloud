@@ -1,5 +1,9 @@
 {
-	"dreo-cloud adapter settings": "Настройки адаптера для dreo-cloud",
-	"option1": "вариант 1",
-	"option2": "вариант 2"
+	"dreo-cloud adapter settings": "Adapter settings for DREO Cloud",
+	"email": "DREO email address",
+	"email_help": "Email address of the DREO account used by the adapter.",
+	"password": "DREO password",
+	"password_help": "Password of the DREO account used by the adapter.",
+	"region": "Cloud region",
+	"region_help": "DREO cloud region assigned to the account."
 }

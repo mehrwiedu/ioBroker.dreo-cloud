@@ -76,8 +76,9 @@
 		]
 	},
 	"native": {
-		"option1": true,
-		"option2": "42"
+		"email": "",
+		"password": "",
+		"region": "EU"
 	},
 	"objects": [],
 	"instanceObjects": [
@@ -102,5 +103,7 @@
 			},
 			"native": {}
 		}
-	]
+	],
+	"encryptedNative": ["password"],
+	"protectedNative": ["password"]
 }
