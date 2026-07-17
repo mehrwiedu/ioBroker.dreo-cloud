@@ -2,4 +2,7 @@ blank_issues_enabled: false
 contact_links:
     - name: ioBroker Community
       url: https://forum.iobroker.net/
-      about: Please ask and answer questions here.
+      about: Ask general setup and support questions here.
+    - name: Contribution guidelines
+      url: https://github.com/mehrwiedu/ioBroker.dreo-cloud/blob/main/CONTRIBUTING.md
+      about: Read the reporting, privacy, device support, and contribution guidelines.

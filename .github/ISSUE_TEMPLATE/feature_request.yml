@@ -1,62 +1,53 @@
 name: Feature request
-description: Suggest an idea for this adapter
-title: "[Feature Request]: "
-labels: []
+description: Suggest an adapter improvement or new general functionality
+title: '[Feature Request]: '
+labels:
+    - enhancement
 body:
-  - type: markdown
-    attributes:
-      value: >
-        **Thank you for wanting to suggest a feature for this adapter!**
+    - type: markdown
+      attributes:
+          value: |
+              Use this form for general adapter improvements.
 
+              For support of a new DREO model, a newly observed raw state, or a device-specific function, use the **Device or function support** template instead.
 
-        Please note that feature requests should be about new functionality or improvements
-        to the adapter itself.
+              General setup questions belong in the ioBroker community forum.
 
+    - type: textarea
+      id: problem-description
+      attributes:
+          label: Problem or limitation
+          description: Explain the problem the requested feature would solve.
+          placeholder: Describe the current limitation.
+      validations:
+          required: true
 
-        Before submitting, please check if:
+    - type: textarea
+      id: proposed-solution
+      attributes:
+          label: Proposed solution
+          description: Describe the behavior you would like to see.
+      validations:
+          required: true
 
-        - The feature already exists in the latest version
+    - type: textarea
+      id: alternatives
+      attributes:
+          label: Alternatives considered
+          description: Describe workarounds or alternative approaches you considered.
 
-        - There is already an open issue for this feature
+    - type: textarea
+      id: additional-context
+      attributes:
+          label: Additional context
+          description: Add relevant examples, screenshots, or links.
 
-        - This is about the adapter and not about ioBroker core functionality
-
-
-        For general questions or support, please use the
-        [ioBroker forum at forum.iobroker.net](https://forum.iobroker.net/).
-
-
-        Thank you for your collaboration!
-
-  - type: textarea
-    id: problem-description
-    attributes:
-      label: Is your feature request related to a problem?
-      description: A clear and concise description of what the problem is.
-      placeholder: "I'm always frustrated when ..."
-    validations:
-      required: false
-
-  - type: textarea
-    id: proposed-solution
-    attributes:
-      label: Describe the solution you'd like
-      description: A clear and concise description of what you want to happen.
-    validations:
-      required: true
-
-  - type: textarea
-    id: alternatives
-    attributes:
-      label: Describe alternatives you've considered
-      description: A clear and concise description of any alternative solutions or features you've considered.
-    validations:
-      required: false
-
-  - type: textarea
-    id: additional-context
-    attributes:
-      label: Additional context
-      description: Add any other context, screenshots, or examples about the feature request here.
-    validations:
-      required: false
+    - type: checkboxes
+      id: confirmations
+      attributes:
+          label: Confirmation
+          options:
+              - label: This request concerns the adapter and not ioBroker core or the DREO app.
+                required: true
+              - label: I searched existing issues for a similar request.
+                required: true

@@ -1,0 +1,138 @@
+name: Device or function support
+description: Request support for a DREO device, raw state, or device-specific function
+title: '[Device Support]: '
+labels:
+    - enhancement
+    - device-support
+body:
+    - type: markdown
+      attributes:
+          value: |
+              Use this form for a new DREO device, an unsupported device function, or an unknown raw state.
+
+              State names alone are not sufficient evidence for writable support. Please provide observed behavior wherever possible.
+
+              Do not publish DREO credentials, tokens, complete serial numbers, account identifiers, family identifiers, room identifiers, or unredacted WebSocket captures.
+
+    - type: input
+      id: device-model
+      attributes:
+          label: Exact DREO device model
+          description: Enter the model only, not the serial number.
+          placeholder: e.g. DR-HHM001S
+      validations:
+          required: true
+
+    - type: input
+      id: device-category
+      attributes:
+          label: Device category
+          placeholder: e.g. humidifier, air purifier, ceiling fan
+      validations:
+          required: true
+
+    - type: dropdown
+      id: region
+      attributes:
+          label: DREO cloud region
+          options:
+              - EU
+              - US
+              - Unknown
+      validations:
+          required: true
+
+    - type: dropdown
+      id: shared-home
+      attributes:
+          label: Is the device accessed through a shared DREO home?
+          options:
+              - 'Yes'
+              - 'No'
+              - 'Unknown'
+      validations:
+          required: true
+
+    - type: textarea
+      id: requested-support
+      attributes:
+          label: Requested device or function support
+          description: Describe what is missing or currently unsupported.
+      validations:
+          required: true
+
+    - type: textarea
+      id: raw-states
+      attributes:
+          label: Observed raw state keys and values
+          description: |
+              List only relevant keys and example values. Redact identifying values.
+          placeholder: |
+              rh: 43
+              foglevel: 6
+              mode: 0
+          render: yaml
+
+    - type: textarea
+      id: observed-changes
+      attributes:
+          label: Observed changes in the DREO app
+          description: |
+              Change one function at a time and document the raw values before and after.
+          placeholder: |
+              Before:
+              foglevel: 3
+
+              Action:
+              Increased mist level once in the DREO app
+
+              After:
+              foglevel: 4
+
+    - type: textarea
+      id: constraints
+      attributes:
+          label: Known constraints
+          description: Include minimum, maximum, step, or allowed values when available.
+          placeholder: |
+              min: 0
+              max: 6
+              step: 1
+          render: yaml
+
+    - type: dropdown
+      id: websocket-confirmed
+      attributes:
+          label: Was the behavior confirmed through a WebSocket report?
+          options:
+              - 'Yes'
+              - 'No'
+              - 'Unknown'
+
+    - type: dropdown
+      id: writable-tested
+      attributes:
+          label: Was safe write behavior tested?
+          options:
+              - 'Yes'
+              - 'No'
+              - 'Not applicable'
+
+    - type: textarea
+      id: logs
+      attributes:
+          label: Redacted logs or report excerpts
+          description: Remove credentials, tokens, complete serial numbers, account data, family IDs, room IDs, and private network details.
+          render: text
+
+    - type: checkboxes
+      id: confirmations
+      attributes:
+          label: Confirmation
+          options:
+              - label: I changed only one DREO function at a time when collecting observations.
+                required: true
+              - label: I removed credentials, tokens, complete serial numbers, and other identifying DREO data.
+                required: true
+              - label: I understand that unknown states will not be made writable based on their name alone.
+                required: true
