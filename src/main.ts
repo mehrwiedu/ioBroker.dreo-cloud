@@ -295,8 +295,10 @@ class DreoCloud extends utils.Adapter {
 
 		this.log.info(
 			`Received runtime discovery event for ${event.resolvedDevice.device.deviceName} ` +
-				`(${event.resolvedDevice.device.model}, ${event.resolvedDevice.device.sn}).`,
+				`(${event.resolvedDevice.device.model}).`,
 		);
+
+		this.log.debug(`Runtime-discovered DREO device serial number: ${event.resolvedDevice.device.sn}`);
 
 		await this.initializeResolvedDevice(event.resolvedDevice);
 
@@ -761,7 +763,9 @@ class DreoCloud extends utils.Adapter {
 	private formatResolvedDeviceLogMessage(resolvedDevice: ResolvedDevice): string {
 		const { device } = resolvedDevice;
 
-		return `DREO device: ${device.deviceName} (${device.model}, ${device.sn})`;
+		this.log.debug(`DREO device serial number: ${device.sn}`);
+
+		return `DREO device: ${device.deviceName} (${device.model})`;
 	}
 
 	private async handleDeviceStateChanged(event: DreoDeviceStateChangeEvent): Promise<void> {
