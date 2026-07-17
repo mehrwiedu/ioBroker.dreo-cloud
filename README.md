@@ -186,13 +186,9 @@ npm run dev-server -- watch default
 
 ### **WORK IN PROGRESS**
 
-- (mehrwiedu) Creator-based ioBroker adapter structure
-- (mehrwiedu) FamilyTree-based device discovery
-- (mehrwiedu) runtime discovery for newly available devices
-- (mehrwiedu) live raw and friendly state synchronization
-- (mehrwiedu) writable fan, power, and light controls
-- (mehrwiedu) dynamic read-only creation of unknown raw states
-- (mehrwiedu) automatic session renewal and WebSocket reconnect
+- (mehrwiedu) Initial public development version
+
+See [CHANGELOG.md](CHANGELOG.md) for the complete development history.
 
 ## License
 
