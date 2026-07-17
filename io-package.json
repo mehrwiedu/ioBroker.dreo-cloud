@@ -1,8 +1,12 @@
 {
 	"common": {
 		"name": "dreo-cloud",
-		"version": "0.1.0",
+		"version": "0.1.1",
 		"news": {
+			"0.1.1": {
+				"en": "Added the official adapter logo and moved full device serial numbers to debug logs only",
+				"de": "Offizielles Adapterlogo hinzugefügt und vollständige Geräteseriennummern nur noch im Debug-Log ausgegeben"
+			},
 			"0.1.0": {
 				"en": "Initial public release",
 				"de": "Erste öffentliche Veröffentlichung",

@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-17
+
+### Changed
+
+- Added the official DREO Cloud adapter logo
+- Moved full device serial numbers from info logs to debug logs
+- Enabled GitHub Actions trusted publishing for future npm releases
+
 ## [0.1.0] - 2026-07-17
 
 ### Added

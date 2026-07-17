@@ -1,6 +1,6 @@
 {
   "name": "iobroker.dreo-cloud",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Control and monitor DREO cloud-connected smart home devices.",
   "author": {
     "name": "mehrwiedu",
