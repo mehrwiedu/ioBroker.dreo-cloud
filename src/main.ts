@@ -13,6 +13,7 @@ import {
 } from '@mehrwiedu/dreo-api';
 
 import { validateConfig } from './lib/config';
+import { normalizePowerScopedOnState } from './lib/friendly-state';
 
 interface FriendlyStateDefinition {
 	channelId: string;
@@ -623,11 +624,8 @@ class DreoCloud extends utils.Adapter {
 
 		if (this.isPowerScopedFriendlyOnState(definition)) {
 			const powerValue = this.readRawStateValue(resolvedDevice, 'poweron');
-			const isPowered = typeof powerValue === 'boolean' ? powerValue : Boolean(powerValue);
 
-			const isTargetEnabled = typeof value === 'boolean' ? value : Boolean(value);
-
-			return isPowered && isTargetEnabled;
+			return normalizePowerScopedOnState(value, powerValue);
 		}
 
 		switch (definition.type) {
