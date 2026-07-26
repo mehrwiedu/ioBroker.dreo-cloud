@@ -1,9 +1,9 @@
 {
 	"common": {
 		"name": "dreo-cloud",
-		"version": "0.1.2-beta.0",
+		"version": "0.1.2-beta.1",
 		"news": {
-			"0.1.2-beta.0": {
+			"0.1.2-beta.1": {
 				"en": "Added support for older DREO devices without a poweron state",
 				"de": "Unterstützung für ältere DREO-Geräte ohne poweron-Datenpunkt hinzugefügt"
 			},
