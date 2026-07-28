@@ -13,7 +13,7 @@ import {
 } from '@mehrwiedu/dreo-api';
 
 import { validateConfig } from './lib/config';
-import { normalizePowerScopedOnState } from './lib/friendly-state';
+import { normalizePowerScopedOnState, normalizeWritableBoolean } from './lib/friendly-state';
 
 interface FriendlyStateDefinition {
 	channelId: string;
@@ -656,6 +656,7 @@ class DreoCloud extends utils.Adapter {
 			'display.on',
 			'rgb.on',
 			'rgb.brightness',
+			'settings.mute',
 		]);
 
 		return writableStates.has(`${definition.channelId}.${definition.stateId}`);
@@ -950,7 +951,11 @@ class DreoCloud extends utils.Adapter {
 		value: ioBroker.StateValue,
 	): Promise<boolean | number | undefined> {
 		if (stateId === 'on') {
-			const booleanValue = Boolean(value);
+			const booleanValue = normalizeWritableBoolean(value);
+
+			if (booleanValue === undefined) {
+				throw new Error(`Invalid boolean value: ${String(value)}`);
+			}
 
 			switch (channelId) {
 				case 'power':
@@ -973,6 +978,17 @@ class DreoCloud extends utils.Adapter {
 				default:
 					return undefined;
 			}
+		}
+
+		if (channelId === 'settings' && stateId === 'mute') {
+			const booleanValue = normalizeWritableBoolean(value);
+
+			if (booleanValue === undefined) {
+				throw new Error(`Invalid boolean value: ${String(value)}`);
+			}
+
+			await device.setMute(booleanValue);
+			return booleanValue;
 		}
 
 		const numberValue = this.normalizeWritableNumber(value);
