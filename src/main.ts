@@ -13,7 +13,12 @@ import {
 } from '@mehrwiedu/dreo-api';
 
 import { validateConfig } from './lib/config';
-import { normalizePowerScopedOnState, normalizeWritableBoolean } from './lib/friendly-state';
+import {
+	getConfiguredSleepLightDurationMinutes,
+	normalizePowerScopedOnState,
+	normalizeSleepLightSceneValue,
+	normalizeWritableBoolean,
+} from './lib/friendly-state';
 
 interface FriendlyStateDefinition {
 	channelId: string;
@@ -25,6 +30,9 @@ interface FriendlyStateDefinition {
 	type: 'boolean' | 'number' | 'string';
 	role: string;
 	unit?: string;
+	min?: number;
+	max?: number;
+	step?: number;
 }
 
 const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
@@ -108,6 +116,44 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		rawKey: 'colortemp',
 		type: 'number',
 		role: 'level.color.temperature',
+	},
+	{
+		channelId: 'sleepLight',
+		path: ['light', 'sleep', 'on'],
+		channelNames: ['Light', 'Sleep light'],
+		stateId: 'on',
+		stateName: 'Sleep light',
+		rawKey: 'scenes',
+		type: 'boolean',
+		role: 'switch.light',
+	},
+	{
+		channelId: 'sleepLight',
+		path: ['light', 'sleep', 'duration'],
+		channelNames: ['Light', 'Sleep light'],
+		stateId: 'duration',
+		stateName: 'Duration',
+		rawKey: 'scenes',
+		type: 'number',
+		role: 'value.interval',
+		unit: 'min',
+		min: 0,
+		max: 60,
+		step: 1,
+	},
+	{
+		channelId: 'sleepLight',
+		path: ['light', 'sleep', 'startBrightness'],
+		channelNames: ['Light', 'Sleep light'],
+		stateId: 'startBrightness',
+		stateName: 'Start brightness',
+		rawKey: 'scenes',
+		type: 'number',
+		role: 'level.dimmer',
+		unit: '%',
+		min: 0,
+		max: 100,
+		step: 1,
 	},
 	{
 		channelId: 'display',
@@ -538,6 +584,9 @@ class DreoCloud extends utils.Adapter {
 		const discoveredState = resolvedDevice.states.find(state => state.key === definition.rawKey);
 		const numberConstraint =
 			discoveredState?.constraint?.type === 'number' ? discoveredState.constraint : undefined;
+		const minimum = definition.min ?? numberConstraint?.min;
+		const maximum = definition.max ?? numberConstraint?.max;
+		const step = definition.step ?? numberConstraint?.step;
 
 		await this.setObjectAsync(objectId, {
 			type: 'state',
@@ -548,9 +597,9 @@ class DreoCloud extends utils.Adapter {
 				read: true,
 				write: writable,
 				unit: definition.unit,
-				...(numberConstraint?.min !== undefined ? { min: numberConstraint.min } : {}),
-				...(numberConstraint?.max !== undefined ? { max: numberConstraint.max } : {}),
-				...(numberConstraint?.step !== undefined ? { step: numberConstraint.step } : {}),
+				...(minimum !== undefined ? { min: minimum } : {}),
+				...(maximum !== undefined ? { max: maximum } : {}),
+				...(step !== undefined ? { step } : {}),
 			},
 			native: {
 				rawKey: definition.rawKey,
@@ -569,8 +618,14 @@ class DreoCloud extends utils.Adapter {
 				continue;
 			}
 
+			const normalizedValue = this.normalizeFriendlyStateValue(rawValue, definition, resolvedDevice);
+
+			if (normalizedValue === undefined) {
+				continue;
+			}
+
 			await this.setStateAsync(`devices.${deviceId}.${definition.path.join('.')}`, {
-				val: this.normalizeFriendlyStateValue(rawValue, definition, resolvedDevice),
+				val: normalizedValue,
 				ack: true,
 			});
 		}
@@ -617,9 +672,15 @@ class DreoCloud extends utils.Adapter {
 		value: unknown,
 		definition: FriendlyStateDefinition,
 		resolvedDevice: ResolvedDevice,
-	): string | number | boolean | null {
+	): string | number | boolean | null | undefined {
 		if (value === null) {
 			return null;
+		}
+
+		if (definition.channelId === 'sleepLight') {
+			const scene = this.client?.getDevice(resolvedDevice.device.sn)?.state.scene;
+
+			return normalizeSleepLightSceneValue(scene, definition.stateId);
 		}
 
 		if (this.isPowerScopedFriendlyOnState(definition)) {
@@ -656,6 +717,8 @@ class DreoCloud extends utils.Adapter {
 			'display.on',
 			'rgb.on',
 			'rgb.brightness',
+			'sleepLight.on',
+			'sleepLight.duration',
 			'settings.mute',
 		]);
 
@@ -975,6 +1038,23 @@ class DreoCloud extends utils.Adapter {
 					await device.setAtmosphereLight(booleanValue);
 					return booleanValue;
 
+				case 'sleepLight':
+					if (booleanValue) {
+						const durationMinutes = getConfiguredSleepLightDurationMinutes(device.state.scene);
+
+						if (durationMinutes === undefined) {
+							throw new Error(
+								'Sleep light duration must be configured between 10 and 60 minutes before enabling.',
+							);
+						}
+
+						await device.setSleepLight(durationMinutes);
+					} else {
+						await device.disableSleepLight();
+					}
+
+					return booleanValue;
+
 				default:
 					return undefined;
 			}
@@ -995,6 +1075,11 @@ class DreoCloud extends utils.Adapter {
 
 		if (numberValue === undefined) {
 			throw new Error(`Invalid numeric value: ${String(value)}`);
+		}
+
+		if (channelId === 'sleepLight' && stateId === 'duration') {
+			await device.setSleepLight(numberValue);
+			return numberValue;
 		}
 
 		if (channelId === 'fan' && stateId === 'speed') {

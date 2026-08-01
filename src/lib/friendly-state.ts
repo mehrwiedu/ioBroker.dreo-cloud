@@ -1,3 +1,5 @@
+import type { DreoSceneConfiguration } from '@mehrwiedu/dreo-api';
+
 /**
  * Normalizes an on/off state whose effective value may depend on the device power state.
  *
@@ -51,4 +53,54 @@ export function normalizeWritableBoolean(value: unknown): boolean | undefined {
 	}
 
 	return undefined;
+}
+
+/**
+ * Converts a structured DREO sleep-light scene into a Friendly-State value.
+ *
+ * @param scene The parsed DREO scene configuration.
+ * @param stateId The requested Friendly-State identifier.
+ * @returns The Friendly-State value, or undefined for invalid data.
+ */
+export function normalizeSleepLightSceneValue(
+	scene: DreoSceneConfiguration | undefined,
+	stateId: string,
+): boolean | number | undefined {
+	if (!scene) {
+		return undefined;
+	}
+
+	switch (stateId) {
+		case 'on':
+			return scene.mode === 3;
+
+		case 'duration':
+			if (!Number.isFinite(scene.du) || !Number.isInteger(scene.du) || scene.du < 0 || scene.du % 60 !== 0) {
+				return undefined;
+			}
+
+			return scene.du / 60;
+
+		case 'startBrightness':
+			return Number.isFinite(scene.maxbri) ? scene.maxbri : undefined;
+
+		default:
+			return undefined;
+	}
+}
+
+/**
+ * Returns a configured duration suitable for restarting the sleep-light scene.
+ *
+ * @param scene The parsed DREO scene configuration.
+ * @returns Whole minutes from 10 to 60, or undefined when no valid duration is configured.
+ */
+export function getConfiguredSleepLightDurationMinutes(scene: DreoSceneConfiguration | undefined): number | undefined {
+	const duration = normalizeSleepLightSceneValue(scene, 'duration');
+
+	if (typeof duration !== 'number' || !Number.isInteger(duration) || duration < 10 || duration > 60) {
+		return undefined;
+	}
+
+	return duration;
 }
