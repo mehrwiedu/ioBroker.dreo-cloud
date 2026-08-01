@@ -22,6 +22,7 @@ import {
 	normalizeWritableBoolean,
 	selectDisplayRawKey,
 } from './lib/friendly-state';
+import { formatDiscoveredRawKeysMessage } from './lib/raw-state';
 
 interface FriendlyStateDefinition {
 	channelId: string;
@@ -538,7 +539,7 @@ class DreoCloud extends utils.Adapter {
 	private async createRawStateObject(deviceId: string, state: DiscoveredState): Promise<void> {
 		const stateId = this.createRawStateObjectId(state.key);
 
-		await this.setObjectNotExistsAsync(`devices.${deviceId}.raw.${stateId}`, {
+		await this.extendObjectAsync(`devices.${deviceId}.raw.${stateId}`, {
 			type: 'state',
 			common: {
 				name: state.description,
@@ -959,14 +960,14 @@ class DreoCloud extends utils.Adapter {
 			return;
 		}
 
-		let discoveredStateCount = 0;
+		const discoveredStateKeys: string[] = [];
 
 		for (const [key, value] of Object.entries(event.reported)) {
 			const existingState = this.findRawStateMetadata(resolvedDevice, key);
 
 			if (!existingState) {
 				await this.createRuntimeRawState(resolvedDevice, key, value);
-				discoveredStateCount += 1;
+				discoveredStateKeys.push(key);
 			}
 
 			const mixedStates = resolvedDevice.state.data.mixed as Record<string, { state: unknown }>;
@@ -983,10 +984,10 @@ class DreoCloud extends utils.Adapter {
 		await this.setRuntimeRawDeviceStates(resolvedDevice);
 		await this.setFriendlyDeviceStates(resolvedDevice);
 
-		if (discoveredStateCount > 0) {
-			this.log.info(
-				`Discovered ${discoveredStateCount} new DREO RAW key(s) for ${resolvedDevice.device.deviceName}.`,
-			);
+		const discoveryMessage = formatDiscoveredRawKeysMessage(resolvedDevice.device.deviceName, discoveredStateKeys);
+
+		if (discoveryMessage) {
+			this.log.info(discoveryMessage);
 		}
 
 		this.log.debug(`Applied DREO live update for ${resolvedDevice.device.deviceName}.`);
