@@ -370,7 +370,7 @@ class DreoCloud extends utils.Adapter {
 		const deviceId = this.createDeviceObjectId(resolvedDevice);
 		const { device } = resolvedDevice;
 
-		await this.setObjectNotExistsAsync(`devices.${deviceId}`, {
+		await this.extendObjectAsync(`devices.${deviceId}`, {
 			type: 'device',
 			common: {
 				name: device.deviceName,
