@@ -16,6 +16,7 @@ import { validateConfig } from './lib/config';
 import {
 	getConfiguredSleepLightDurationMinutes,
 	normalizePowerScopedOnState,
+	normalizePowerTimerValue,
 	normalizeSleepLightSceneValue,
 	normalizeWritableBoolean,
 } from './lib/friendly-state';
@@ -217,24 +218,52 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		role: 'switch.lock',
 	},
 	{
-		channelId: 'timer',
-		path: ['timer', 'on'],
-		channelNames: ['Timer'],
-		stateId: 'on',
-		stateName: 'Timer on',
+		channelId: 'powerOnTimer',
+		path: ['timer', 'on', 'duration'],
+		channelNames: ['Timer', 'Power-on timer'],
+		stateId: 'duration',
+		stateName: 'Duration',
 		rawKey: 'timeron',
 		type: 'number',
-		role: 'value',
+		role: 'value.interval',
+		unit: 'min',
+		min: 0,
+		max: 719,
+		step: 1,
 	},
 	{
-		channelId: 'timer',
-		path: ['timer', 'off'],
-		channelNames: ['Timer'],
-		stateId: 'off',
-		stateName: 'Timer off',
+		channelId: 'powerOnTimer',
+		path: ['timer', 'on', 'active'],
+		channelNames: ['Timer', 'Power-on timer'],
+		stateId: 'active',
+		stateName: 'Active',
+		rawKey: 'timeron',
+		type: 'boolean',
+		role: 'indicator',
+	},
+	{
+		channelId: 'powerOffTimer',
+		path: ['timer', 'off', 'duration'],
+		channelNames: ['Timer', 'Power-off timer'],
+		stateId: 'duration',
+		stateName: 'Duration',
 		rawKey: 'timeroff',
 		type: 'number',
-		role: 'value',
+		role: 'value.interval',
+		unit: 'min',
+		min: 0,
+		max: 719,
+		step: 1,
+	},
+	{
+		channelId: 'powerOffTimer',
+		path: ['timer', 'off', 'active'],
+		channelNames: ['Timer', 'Power-off timer'],
+		stateId: 'active',
+		stateName: 'Active',
+		rawKey: 'timeroff',
+		type: 'boolean',
+		role: 'indicator',
 	},
 ];
 
@@ -545,6 +574,8 @@ class DreoCloud extends utils.Adapter {
 		const definitions = this.getAvailableFriendlyStateDefinitions(resolvedDevice);
 		const createdChannelPaths = new Set<string>();
 
+		await this.migrateLegacyTimerStateObjects(deviceId, definitions);
+
 		for (const definition of definitions) {
 			const channelPathParts = definition.path.slice(0, -1);
 
@@ -571,6 +602,45 @@ class DreoCloud extends utils.Adapter {
 
 		for (const definition of definitions) {
 			await this.createFriendlyStateObject(resolvedDevice, deviceId, definition);
+		}
+	}
+
+	private async migrateLegacyTimerStateObjects(
+		deviceId: string,
+		definitions: readonly FriendlyStateDefinition[],
+	): Promise<void> {
+		const migrations = [
+			{
+				channelId: 'powerOnTimer',
+				path: 'timer.on',
+			},
+			{
+				channelId: 'powerOffTimer',
+				path: 'timer.off',
+			},
+		] as const;
+
+		for (const migration of migrations) {
+			if (!definitions.some(definition => definition.channelId === migration.channelId)) {
+				continue;
+			}
+
+			const objectId = `devices.${deviceId}.${migration.path}`;
+			const existingObject = await this.getObjectAsync(objectId);
+
+			if (existingObject?.type !== 'state') {
+				continue;
+			}
+
+			const existingState = await this.getStateAsync(objectId);
+
+			if (existingState) {
+				await this.delStateAsync(objectId);
+			}
+
+			await this.delObjectAsync(objectId);
+
+			this.log.info(`Migrated legacy timer state ${objectId} to a channel.`);
 		}
 	}
 
@@ -677,6 +747,14 @@ class DreoCloud extends utils.Adapter {
 			return null;
 		}
 
+		if (definition.channelId === 'powerOnTimer' || definition.channelId === 'powerOffTimer') {
+			const deviceState = this.client?.getDevice(resolvedDevice.device.sn)?.state;
+			const timer =
+				definition.channelId === 'powerOnTimer' ? deviceState?.powerOnTimer : deviceState?.powerOffTimer;
+
+			return normalizePowerTimerValue(timer, definition.stateId);
+		}
+
 		if (definition.channelId === 'sleepLight') {
 			const scene = this.client?.getDevice(resolvedDevice.device.sn)?.state.scene;
 
@@ -719,6 +797,8 @@ class DreoCloud extends utils.Adapter {
 			'rgb.brightness',
 			'sleepLight.on',
 			'sleepLight.duration',
+			'powerOnTimer.duration',
+			'powerOffTimer.duration',
 			'settings.mute',
 		]);
 
@@ -1079,6 +1159,26 @@ class DreoCloud extends utils.Adapter {
 
 		if (channelId === 'sleepLight' && stateId === 'duration') {
 			await device.setSleepLight(numberValue);
+			return numberValue;
+		}
+
+		if (channelId === 'powerOnTimer' && stateId === 'duration') {
+			if (numberValue === 0) {
+				await device.cancelPowerOnTimer();
+			} else {
+				await device.setPowerOnTimer(numberValue);
+			}
+
+			return numberValue;
+		}
+
+		if (channelId === 'powerOffTimer' && stateId === 'duration') {
+			if (numberValue === 0) {
+				await device.cancelPowerOffTimer();
+			} else {
+				await device.setPowerOffTimer(numberValue);
+			}
+
 			return numberValue;
 		}
 

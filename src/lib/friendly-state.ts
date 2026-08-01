@@ -1,4 +1,4 @@
-import type { DreoSceneConfiguration } from '@mehrwiedu/dreo-api';
+import type { DreoSceneConfiguration, DreoTimerConfiguration } from '@mehrwiedu/dreo-api';
 
 /**
  * Normalizes an on/off state whose effective value may depend on the device power state.
@@ -103,4 +103,31 @@ export function getConfiguredSleepLightDurationMinutes(scene: DreoSceneConfigura
 	}
 
 	return duration;
+}
+
+/**
+ * Converts a structured native DREO power timer into a Friendly-State value.
+ *
+ * @param timer The parsed DREO timer configuration.
+ * @param stateId The requested Friendly-State identifier.
+ * @returns The Friendly-State value, or undefined for invalid data.
+ */
+export function normalizePowerTimerValue(
+	timer: DreoTimerConfiguration | undefined,
+	stateId: string,
+): boolean | number | undefined {
+	if (!timer || !Number.isFinite(timer.du) || !Number.isInteger(timer.du) || timer.du < 0 || timer.du > 719) {
+		return undefined;
+	}
+
+	switch (stateId) {
+		case 'duration':
+			return timer.du;
+
+		case 'active':
+			return timer.du > 0;
+
+		default:
+			return undefined;
+	}
 }

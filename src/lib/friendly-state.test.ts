@@ -3,6 +3,7 @@ import { expect } from 'chai';
 import {
 	getConfiguredSleepLightDurationMinutes,
 	normalizePowerScopedOnState,
+	normalizePowerTimerValue,
 	normalizeSleepLightSceneValue,
 	normalizeWritableBoolean,
 } from './friendly-state';
@@ -148,6 +149,62 @@ describe('getConfiguredSleepLightDurationMinutes', () => {
 				minbri: 1,
 				maxbri: 29,
 			}),
+		).to.equal(undefined);
+	});
+});
+
+describe('normalizePowerTimerValue', () => {
+	it('maps an active timer to its duration and active state', () => {
+		const timer = {
+			du: 30,
+			ts: 1_785_611_737,
+		};
+
+		expect(normalizePowerTimerValue(timer, 'duration')).to.equal(30);
+		expect(normalizePowerTimerValue(timer, 'active')).to.equal(true);
+	});
+
+	it('maps a duration of zero to an inactive timer', () => {
+		const timer = {
+			du: 0,
+			ts: 1_785_611_745,
+		};
+
+		expect(normalizePowerTimerValue(timer, 'duration')).to.equal(0);
+		expect(normalizePowerTimerValue(timer, 'active')).to.equal(false);
+	});
+
+	it('rejects missing, malformed, and unsupported timer values', () => {
+		expect(normalizePowerTimerValue(undefined, 'duration')).to.equal(undefined);
+
+		expect(
+			normalizePowerTimerValue(
+				{
+					du: 1.5,
+					ts: 1_785_611_745,
+				},
+				'duration',
+			),
+		).to.equal(undefined);
+
+		expect(
+			normalizePowerTimerValue(
+				{
+					du: 720,
+					ts: 1_785_611_745,
+				},
+				'active',
+			),
+		).to.equal(undefined);
+
+		expect(
+			normalizePowerTimerValue(
+				{
+					du: 10,
+					ts: 1_785_611_745,
+				},
+				'unknown',
+			),
 		).to.equal(undefined);
 	});
 });
