@@ -15,10 +15,12 @@ import {
 import { validateConfig } from './lib/config';
 import {
 	getConfiguredSleepLightDurationMinutes,
+	normalizePowerScopedLevelOnState,
 	normalizePowerScopedOnState,
 	normalizePowerTimerValue,
 	normalizeSleepLightSceneValue,
 	normalizeWritableBoolean,
+	selectDisplayRawKey,
 } from './lib/friendly-state';
 
 interface FriendlyStateDefinition {
@@ -165,6 +167,26 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		rawKey: 'lighton',
 		type: 'boolean',
 		role: 'switch',
+	},
+	{
+		channelId: 'display',
+		path: ['display', 'on'],
+		channelNames: ['Display'],
+		stateId: 'on',
+		stateName: 'Display',
+		rawKey: 'ledlevel',
+		type: 'boolean',
+		role: 'switch',
+	},
+	{
+		channelId: 'moodLight',
+		path: ['light', 'mood', 'on'],
+		channelNames: ['Light', 'Mood light'],
+		stateId: 'on',
+		stateName: 'Mood light',
+		rawKey: 'rgblevel',
+		type: 'boolean',
+		role: 'switch.light',
 	},
 	{
 		channelId: 'rgb',
@@ -707,6 +729,8 @@ class DreoCloud extends utils.Adapter {
 		const hasMainLight =
 			availableRawKeys.has('lighton') && availableRawKeys.has('brightness') && availableRawKeys.has('colortemp');
 
+		const displayRawKey = selectDisplayRawKey(availableRawKeys);
+
 		const hasAmbientLight =
 			availableRawKeys.has('atmon') || availableRawKeys.has('atmbri') || availableRawKeys.has('rgbpresetsel');
 
@@ -727,7 +751,11 @@ class DreoCloud extends utils.Adapter {
 			}
 
 			if (definition.channelId === 'display') {
-				return definition.rawKey === 'lighton' && !hasMainLight;
+				return definition.rawKey === displayRawKey;
+			}
+
+			if (definition.channelId === 'moodLight') {
+				return availableRawKeys.has('poweron');
 			}
 
 			if (definition.channelId === 'rgb') {
@@ -759,6 +787,12 @@ class DreoCloud extends utils.Adapter {
 			const scene = this.client?.getDevice(resolvedDevice.device.sn)?.state.scene;
 
 			return normalizeSleepLightSceneValue(scene, definition.stateId);
+		}
+
+		if (definition.rawKey === 'rgblevel' || definition.rawKey === 'ledlevel') {
+			const powerValue = this.readRawStateValue(resolvedDevice, 'poweron');
+
+			return normalizePowerScopedLevelOnState(value, powerValue);
 		}
 
 		if (this.isPowerScopedFriendlyOnState(definition)) {
@@ -793,6 +827,7 @@ class DreoCloud extends utils.Adapter {
 			'mainLight.brightness',
 			'mainLight.colorTemperature',
 			'display.on',
+			'moodLight.on',
 			'rgb.on',
 			'rgb.brightness',
 			'sleepLight.on',
@@ -1110,8 +1145,25 @@ class DreoCloud extends utils.Adapter {
 					return booleanValue;
 
 				case 'mainLight':
-				case 'display':
 					await device.setMainLight(booleanValue);
+					return booleanValue;
+
+				case 'display': {
+					const displayRawKey = selectDisplayRawKey(new Set(Object.keys(device.state.raw)));
+
+					if (displayRawKey === 'ledlevel') {
+						await device.setDisplay(booleanValue);
+					} else if (displayRawKey === 'lighton') {
+						await device.setMainLight(booleanValue);
+					} else {
+						throw new Error('No writable display control is available on this device.');
+					}
+
+					return booleanValue;
+				}
+
+				case 'moodLight':
+					await device.setMoodLight(booleanValue);
 					return booleanValue;
 
 				case 'rgb':

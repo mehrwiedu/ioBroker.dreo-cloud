@@ -131,3 +131,54 @@ export function normalizePowerTimerValue(
 			return undefined;
 	}
 }
+
+/**
+ * Normalizes a numeric indicator level whose effective state depends on
+ * whether the complete device is powered on.
+ *
+ * Zero means off. Every positive finite level is treated as on so that
+ * possible future or model-specific levels remain readable.
+ *
+ * @param value The native numeric level.
+ * @param powerValue The native device power state.
+ * @returns The effective on/off state, or undefined for an invalid level.
+ */
+export function normalizePowerScopedLevelOnState(value: unknown, powerValue: unknown): boolean | undefined {
+	if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+		return undefined;
+	}
+
+	const levelEnabled = value > 0;
+
+	if (typeof powerValue !== 'boolean') {
+		return levelEnabled;
+	}
+
+	return powerValue && levelEnabled;
+}
+
+/**
+ * Selects the native RAW state represented by the Friendly State
+ * `display.on`.
+ *
+ * A dedicated ledlevel control takes precedence when it is accompanied by
+ * poweron. Otherwise lighton is used only when it does not represent a
+ * complete main light with brightness and color-temperature controls.
+ *
+ * @param availableRawKeys The RAW capabilities available on the device.
+ * @returns The selected RAW key, or undefined when no display control exists.
+ */
+export function selectDisplayRawKey(availableRawKeys: ReadonlySet<string>): 'ledlevel' | 'lighton' | undefined {
+	if (availableRawKeys.has('ledlevel') && availableRawKeys.has('poweron')) {
+		return 'ledlevel';
+	}
+
+	const hasMainLight =
+		availableRawKeys.has('lighton') && availableRawKeys.has('brightness') && availableRawKeys.has('colortemp');
+
+	if (availableRawKeys.has('lighton') && !hasMainLight) {
+		return 'lighton';
+	}
+
+	return undefined;
+}

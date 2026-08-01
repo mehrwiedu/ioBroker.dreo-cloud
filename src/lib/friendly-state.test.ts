@@ -2,10 +2,12 @@ import { expect } from 'chai';
 
 import {
 	getConfiguredSleepLightDurationMinutes,
+	normalizePowerScopedLevelOnState,
 	normalizePowerScopedOnState,
 	normalizePowerTimerValue,
 	normalizeSleepLightSceneValue,
 	normalizeWritableBoolean,
+	selectDisplayRawKey,
 } from './friendly-state';
 
 describe('normalizePowerScopedOnState', () => {
@@ -206,5 +208,53 @@ describe('normalizePowerTimerValue', () => {
 				'unknown',
 			),
 		).to.equal(undefined);
+	});
+});
+
+describe('normalizePowerScopedLevelOnState', () => {
+	it('treats every positive level as enabled while the device is powered on', () => {
+		expect(normalizePowerScopedLevelOnState(1, true)).to.equal(true);
+		expect(normalizePowerScopedLevelOnState(2, true)).to.equal(true);
+	});
+
+	it('treats level zero as disabled', () => {
+		expect(normalizePowerScopedLevelOnState(0, true)).to.equal(false);
+	});
+
+	it('reports the indicator as effectively off while device power is off', () => {
+		expect(normalizePowerScopedLevelOnState(2, false)).to.equal(false);
+	});
+
+	it('preserves the level state when no power state is available', () => {
+		expect(normalizePowerScopedLevelOnState(2, undefined)).to.equal(true);
+		expect(normalizePowerScopedLevelOnState(0, undefined)).to.equal(false);
+	});
+
+	it('rejects malformed levels', () => {
+		expect(normalizePowerScopedLevelOnState(-1, true)).to.equal(undefined);
+		expect(normalizePowerScopedLevelOnState(Number.NaN, true)).to.equal(undefined);
+		expect(normalizePowerScopedLevelOnState('2', true)).to.equal(undefined);
+	});
+});
+
+describe('selectDisplayRawKey', () => {
+	it('prefers the dedicated humidifier display level', () => {
+		expect(selectDisplayRawKey(new Set(['poweron', 'ledlevel', 'lighton']))).to.equal('ledlevel');
+	});
+
+	it('uses lighton for a device display without a complete main light', () => {
+		expect(selectDisplayRawKey(new Set(['poweron', 'lighton']))).to.equal('lighton');
+	});
+
+	it('does not expose a complete main light as an additional display', () => {
+		expect(selectDisplayRawKey(new Set(['poweron', 'lighton', 'brightness', 'colortemp']))).to.equal(undefined);
+	});
+
+	it('does not select ledlevel without the required power state', () => {
+		expect(selectDisplayRawKey(new Set(['ledlevel']))).to.equal(undefined);
+	});
+
+	it('falls back to lighton when an unusable ledlevel also exists', () => {
+		expect(selectDisplayRawKey(new Set(['ledlevel', 'lighton']))).to.equal('lighton');
 	});
 });
