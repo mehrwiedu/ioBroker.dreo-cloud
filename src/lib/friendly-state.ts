@@ -181,6 +181,35 @@ export function normalizeWritableDirectionalOscillationAngle(value: unknown): 30
 }
 
 /**
+ * Determines whether a Friendly-State value can be acknowledged immediately.
+ *
+ * Failed writes are restored to the currently confirmed device value.
+ * Successful writes are acknowledged only when the confirmed value already
+ * equals the normalized written value. Actual value changes remain dependent
+ * on a device report.
+ *
+ * @param confirmedValue The value currently confirmed by the device state.
+ * @param writtenValue The normalized value accepted by the write path.
+ * @param writeSucceeded Whether the SDK write completed successfully.
+ * @returns The value to write with ack=true, or undefined while awaiting a report.
+ */
+export function selectFriendlyWriteAcknowledgementValue(
+	confirmedValue: string | number | boolean | null | undefined,
+	writtenValue: string | number | boolean | null | undefined,
+	writeSucceeded: boolean,
+): string | number | boolean | null | undefined {
+	if (confirmedValue === undefined) {
+		return undefined;
+	}
+
+	if (!writeSucceeded) {
+		return confirmedValue;
+	}
+
+	return Object.is(confirmedValue, writtenValue) ? confirmedValue : undefined;
+}
+
+/**
  * Converts a structured DREO sleep-light scene into a Friendly-State value.
  *
  * @param scene The parsed DREO scene configuration.

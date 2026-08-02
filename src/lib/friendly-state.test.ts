@@ -12,6 +12,7 @@ import {
 	normalizeWritableBoolean,
 	normalizeWritableDirectionalOscillationAngle,
 	normalizeWritableDirectionalOscillationMode,
+	selectFriendlyWriteAcknowledgementValue,
 	selectDisplayRawKey,
 } from './friendly-state';
 
@@ -191,6 +192,30 @@ describe('normalizeWritableDirectionalOscillationAngle', () => {
 		expect(normalizeWritableDirectionalOscillationAngle(0)).to.equal(undefined);
 		expect(normalizeWritableDirectionalOscillationAngle(150)).to.equal(undefined);
 		expect(normalizeWritableDirectionalOscillationAngle(null)).to.equal(undefined);
+	});
+});
+
+describe('selectFriendlyWriteAcknowledgementValue', () => {
+	it('acknowledges a successful write when the confirmed value already matches', () => {
+		expect(selectFriendlyWriteAcknowledgementValue(3, 3, true)).to.equal(3);
+		expect(selectFriendlyWriteAcknowledgementValue(false, false, true)).to.equal(false);
+		expect(selectFriendlyWriteAcknowledgementValue('active', 'active', true)).to.equal('active');
+	});
+
+	it('waits for a device report when a successful write changes the value', () => {
+		expect(selectFriendlyWriteAcknowledgementValue(0, 3, true)).to.equal(undefined);
+		expect(selectFriendlyWriteAcknowledgementValue(false, true, true)).to.equal(undefined);
+	});
+
+	it('restores the confirmed value after a failed or rejected write', () => {
+		expect(selectFriendlyWriteAcknowledgementValue(30, 60, false)).to.equal(30);
+		expect(selectFriendlyWriteAcknowledgementValue(true, false, false)).to.equal(true);
+		expect(selectFriendlyWriteAcknowledgementValue(null, 1, false)).to.equal(null);
+	});
+
+	it('cannot reconcile a write without a confirmed device value', () => {
+		expect(selectFriendlyWriteAcknowledgementValue(undefined, 3, true)).to.equal(undefined);
+		expect(selectFriendlyWriteAcknowledgementValue(undefined, 3, false)).to.equal(undefined);
 	});
 });
 

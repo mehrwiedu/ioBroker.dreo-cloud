@@ -25,6 +25,7 @@ import {
 	normalizeWritableBoolean,
 	normalizeWritableDirectionalOscillationAngle,
 	normalizeWritableDirectionalOscillationMode,
+	selectFriendlyWriteAcknowledgementValue,
 	selectDisplayRawKey,
 } from './lib/friendly-state';
 import { formatDiscoveredRawKeysMessage } from './lib/raw-state';
@@ -1239,6 +1240,51 @@ class DreoCloud extends utils.Adapter {
 		}
 	}
 
+	private async reconcileFriendlyStateWrite(
+		deviceId: string,
+		definition: FriendlyStateDefinition,
+		resolvedDevice: ResolvedDevice,
+		writtenValue: ioBroker.StateValue | undefined,
+		writeSucceeded: boolean,
+	): Promise<void> {
+		try {
+			const rawValue = this.readRawStateValue(resolvedDevice, definition.rawKey);
+
+			if (rawValue === undefined) {
+				return;
+			}
+
+			const confirmedValue = this.normalizeFriendlyStateValue(rawValue, definition, resolvedDevice);
+			const acknowledgementValue = selectFriendlyWriteAcknowledgementValue(
+				confirmedValue,
+				writtenValue,
+				writeSucceeded,
+			);
+
+			if (acknowledgementValue === undefined) {
+				return;
+			}
+
+			const objectId = `devices.${deviceId}.${definition.path.join('.')}`;
+
+			await this.setStateAsync(objectId, {
+				val: acknowledgementValue,
+				ack: true,
+			});
+
+			this.log.debug(
+				`${writeSucceeded ? 'Acknowledged confirmed' : 'Restored confirmed'} DREO Friendly-State ` +
+					`${definition.path.join('.')}=${String(acknowledgementValue)} for ` +
+					`${resolvedDevice.device.deviceName}.`,
+			);
+		} catch (error) {
+			this.log.warn(
+				`Could not reconcile DREO Friendly-State ${definition.path.join('.')} for ` +
+					`${resolvedDevice.device.deviceName}: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+	}
+
 	private async onStateChange(id: string, state: ioBroker.State | null | undefined): Promise<void> {
 		if (!state || state.ack) {
 			return;
@@ -1252,7 +1298,18 @@ class DreoCloud extends utils.Adapter {
 
 		const resolvedDevice = this.findResolvedDeviceByObjectId(parsedStateId.deviceId);
 
-		if (!resolvedDevice || !this.client) {
+		if (!resolvedDevice) {
+			return;
+		}
+
+		if (!this.client) {
+			await this.reconcileFriendlyStateWrite(
+				parsedStateId.deviceId,
+				parsedStateId.definition,
+				resolvedDevice,
+				undefined,
+				false,
+			);
 			return;
 		}
 
@@ -1266,6 +1323,14 @@ class DreoCloud extends utils.Adapter {
 					'.',
 				)} for ${resolvedDevice.device.deviceName}.`,
 			);
+
+			await this.reconcileFriendlyStateWrite(
+				parsedStateId.deviceId,
+				parsedStateId.definition,
+				resolvedDevice,
+				undefined,
+				false,
+			);
 			return;
 		}
 
@@ -1273,6 +1338,14 @@ class DreoCloud extends utils.Adapter {
 
 		if (!device) {
 			this.log.warn(`Cannot write DREO state for ${resolvedDevice.device.deviceName}: device is not registered.`);
+
+			await this.reconcileFriendlyStateWrite(
+				parsedStateId.deviceId,
+				parsedStateId.definition,
+				resolvedDevice,
+				undefined,
+				false,
+			);
 			return;
 		}
 
@@ -1285,13 +1358,36 @@ class DreoCloud extends utils.Adapter {
 			);
 
 			if (writtenValue === undefined) {
+				await this.reconcileFriendlyStateWrite(
+					parsedStateId.deviceId,
+					parsedStateId.definition,
+					resolvedDevice,
+					undefined,
+					false,
+				);
 				return;
 			}
+
+			await this.reconcileFriendlyStateWrite(
+				parsedStateId.deviceId,
+				parsedStateId.definition,
+				resolvedDevice,
+				writtenValue,
+				true,
+			);
 
 			this.log.info(
 				`Wrote DREO state ${parsedStateId.channelId}.${parsedStateId.stateId}=${writtenValue} for ${resolvedDevice.device.deviceName}.`,
 			);
 		} catch (error) {
+			await this.reconcileFriendlyStateWrite(
+				parsedStateId.deviceId,
+				parsedStateId.definition,
+				resolvedDevice,
+				undefined,
+				false,
+			);
+
 			this.log.warn(
 				`Failed to write DREO state ${parsedStateId.channelId}.${
 					parsedStateId.stateId
