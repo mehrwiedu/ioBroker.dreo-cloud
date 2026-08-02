@@ -2,11 +2,14 @@ import { expect } from 'chai';
 
 import {
 	getConfiguredSleepLightDurationMinutes,
+	isDirectionalOscillationModel,
+	normalizeDirectionalOscillationMode,
 	normalizePowerScopedLevelOnState,
 	normalizePowerScopedOnState,
 	normalizePowerTimerValue,
 	normalizeSleepLightSceneValue,
 	normalizeWritableBoolean,
+	normalizeWritableDirectionalOscillationMode,
 	selectDisplayRawKey,
 } from './friendly-state';
 
@@ -55,6 +58,53 @@ describe('normalizeWritableBoolean', () => {
 		expect(normalizeWritableBoolean('')).to.equal(undefined);
 		expect(normalizeWritableBoolean(2)).to.equal(undefined);
 		expect(normalizeWritableBoolean(null)).to.equal(undefined);
+	});
+});
+
+describe('isDirectionalOscillationModel', () => {
+	it('accepts the confirmed stand fan model', () => {
+		expect(isDirectionalOscillationModel('DR-HPF002S')).to.equal(true);
+	});
+
+	it('rejects other models using a different or unknown oscmode semantic', () => {
+		expect(isDirectionalOscillationModel('DR-HSH034S')).to.equal(false);
+		expect(isDirectionalOscillationModel('DR-HCF007S')).to.equal(false);
+		expect(isDirectionalOscillationModel(undefined)).to.equal(false);
+	});
+});
+
+describe('normalizeDirectionalOscillationMode', () => {
+	it('accepts all four confirmed directional modes', () => {
+		expect(normalizeDirectionalOscillationMode(0)).to.equal(0);
+		expect(normalizeDirectionalOscillationMode(1)).to.equal(1);
+		expect(normalizeDirectionalOscillationMode(2)).to.equal(2);
+		expect(normalizeDirectionalOscillationMode(3)).to.equal(3);
+	});
+
+	it('rejects fractions, values outside the range, and non-numbers', () => {
+		expect(normalizeDirectionalOscillationMode(-1)).to.equal(undefined);
+		expect(normalizeDirectionalOscillationMode(4)).to.equal(undefined);
+		expect(normalizeDirectionalOscillationMode(1.5)).to.equal(undefined);
+		expect(normalizeDirectionalOscillationMode('2')).to.equal(undefined);
+		expect(normalizeDirectionalOscillationMode(Number.NaN)).to.equal(undefined);
+	});
+});
+
+describe('normalizeWritableDirectionalOscillationMode', () => {
+	it('accepts numbers and numeric strings from ioBroker', () => {
+		expect(normalizeWritableDirectionalOscillationMode(0)).to.equal(0);
+		expect(normalizeWritableDirectionalOscillationMode(3)).to.equal(3);
+		expect(normalizeWritableDirectionalOscillationMode(' 1 ')).to.equal(1);
+		expect(normalizeWritableDirectionalOscillationMode('2')).to.equal(2);
+	});
+
+	it('rejects invalid directional mode writes', () => {
+		expect(normalizeWritableDirectionalOscillationMode('')).to.equal(undefined);
+		expect(normalizeWritableDirectionalOscillationMode('vertical')).to.equal(undefined);
+		expect(normalizeWritableDirectionalOscillationMode('1.5')).to.equal(undefined);
+		expect(normalizeWritableDirectionalOscillationMode(-1)).to.equal(undefined);
+		expect(normalizeWritableDirectionalOscillationMode(4)).to.equal(undefined);
+		expect(normalizeWritableDirectionalOscillationMode(null)).to.equal(undefined);
 	});
 });
 

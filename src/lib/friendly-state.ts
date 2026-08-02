@@ -1,4 +1,8 @@
-import type { DreoSceneConfiguration, DreoTimerConfiguration } from '@mehrwiedu/dreo-api';
+import type {
+	DreoDirectionalOscillationMode,
+	DreoSceneConfiguration,
+	DreoTimerConfiguration,
+} from '@mehrwiedu/dreo-api';
 
 /**
  * Normalizes an on/off state whose effective value may depend on the device power state.
@@ -53,6 +57,64 @@ export function normalizeWritableBoolean(value: unknown): boolean | undefined {
 	}
 
 	return undefined;
+}
+
+/**
+ * Determines whether a model uses the confirmed directional `oscmode`
+ * semantics.
+ *
+ * DR-HPF002S currently uses:
+ * - 0: off
+ * - 1: horizontal
+ * - 2: vertical
+ * - 3: horizontal and vertical
+ *
+ * Other product families can assign different meanings to the same RAW key.
+ *
+ * @param model The reported DREO model identifier.
+ * @returns Whether directional oscillation is confirmed for the model.
+ */
+export function isDirectionalOscillationModel(model: unknown): boolean {
+	return model === 'DR-HPF002S';
+}
+
+/**
+ * Validates a reported directional oscillation mode.
+ *
+ * @param value The reported mode.
+ * @returns A valid mode from 0 to 3, or undefined.
+ */
+export function normalizeDirectionalOscillationMode(value: unknown): DreoDirectionalOscillationMode | undefined {
+	if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isInteger(value) || value < 0 || value > 3) {
+		return undefined;
+	}
+
+	return value as DreoDirectionalOscillationMode;
+}
+
+/**
+ * Converts an ioBroker-compatible value into a directional oscillation mode.
+ *
+ * Numeric strings are accepted, while fractions and values outside 0 to 3
+ * are rejected.
+ *
+ * @param value The requested mode.
+ * @returns A valid mode from 0 to 3, or undefined.
+ */
+export function normalizeWritableDirectionalOscillationMode(
+	value: unknown,
+): DreoDirectionalOscillationMode | undefined {
+	if (typeof value === 'string') {
+		const normalizedValue = value.trim();
+
+		if (normalizedValue.length === 0) {
+			return undefined;
+		}
+
+		return normalizeDirectionalOscillationMode(Number(normalizedValue));
+	}
+
+	return normalizeDirectionalOscillationMode(value);
 }
 
 /**

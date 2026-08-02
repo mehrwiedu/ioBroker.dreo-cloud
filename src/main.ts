@@ -15,11 +15,14 @@ import {
 import { validateConfig } from './lib/config';
 import {
 	getConfiguredSleepLightDurationMinutes,
+	isDirectionalOscillationModel,
+	normalizeDirectionalOscillationMode,
 	normalizePowerScopedLevelOnState,
 	normalizePowerScopedOnState,
 	normalizePowerTimerValue,
 	normalizeSleepLightSceneValue,
 	normalizeWritableBoolean,
+	normalizeWritableDirectionalOscillationMode,
 	selectDisplayRawKey,
 } from './lib/friendly-state';
 import { formatDiscoveredRawKeysMessage } from './lib/raw-state';
@@ -37,6 +40,7 @@ interface FriendlyStateDefinition {
 	min?: number;
 	max?: number;
 	step?: number;
+	states?: Record<string, string>;
 }
 
 const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
@@ -89,6 +93,15 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		rawKey: 'oscmode',
 		type: 'number',
 		role: 'value',
+		min: 0,
+		max: 3,
+		step: 1,
+		states: {
+			0: 'Off',
+			1: 'Horizontal',
+			2: 'Vertical',
+			3: 'Horizontal and vertical',
+		},
 	},
 	{
 		channelId: 'mainLight',
@@ -673,7 +686,7 @@ class DreoCloud extends utils.Adapter {
 		definition: FriendlyStateDefinition,
 	): Promise<void> {
 		const objectId = `devices.${deviceId}.${definition.path.join('.')}`;
-		const writable = this.isWritableFriendlyStateDefinition(definition);
+		const writable = this.isWritableFriendlyStateForDevice(definition, resolvedDevice);
 		const discoveredState = resolvedDevice.states.find(state => state.key === definition.rawKey);
 		const numberConstraint =
 			discoveredState?.constraint?.type === 'number' ? discoveredState.constraint : undefined;
@@ -693,6 +706,7 @@ class DreoCloud extends utils.Adapter {
 				...(minimum !== undefined ? { min: minimum } : {}),
 				...(maximum !== undefined ? { max: maximum } : {}),
 				...(step !== undefined ? { step } : {}),
+				...(definition.states ? { states: definition.states } : {}),
 			},
 			native: {
 				rawKey: definition.rawKey,
@@ -747,6 +761,10 @@ class DreoCloud extends utils.Adapter {
 				return false;
 			}
 
+			if (definition.channelId === 'fan' && definition.stateId === 'oscillationMode') {
+				return isDirectionalOscillationModel(resolvedDevice.device.model);
+			}
+
 			if (definition.channelId === 'mainLight') {
 				return hasMainLight;
 			}
@@ -790,6 +808,12 @@ class DreoCloud extends utils.Adapter {
 			return normalizeSleepLightSceneValue(scene, definition.stateId);
 		}
 
+		if (definition.channelId === 'fan' && definition.stateId === 'oscillationMode') {
+			const mode = this.client?.getDevice(resolvedDevice.device.sn)?.state.directionalOscillationMode;
+
+			return normalizeDirectionalOscillationMode(mode);
+		}
+
 		if (definition.rawKey === 'rgblevel' || definition.rawKey === 'ledlevel') {
 			const powerValue = this.readRawStateValue(resolvedDevice, 'poweron');
 
@@ -824,6 +848,7 @@ class DreoCloud extends utils.Adapter {
 			'power.on',
 			'fan.on',
 			'fan.speed',
+			'fan.oscillationMode',
 			'mainLight.on',
 			'mainLight.brightness',
 			'mainLight.colorTemperature',
@@ -839,6 +864,21 @@ class DreoCloud extends utils.Adapter {
 		]);
 
 		return writableStates.has(`${definition.channelId}.${definition.stateId}`);
+	}
+
+	private isWritableFriendlyStateForDevice(
+		definition: FriendlyStateDefinition,
+		resolvedDevice: ResolvedDevice,
+	): boolean {
+		if (!this.isWritableFriendlyStateDefinition(definition)) {
+			return false;
+		}
+
+		if (definition.channelId === 'fan' && definition.stateId === 'oscillationMode') {
+			return isDirectionalOscillationModel(resolvedDevice.device.model);
+		}
+
+		return true;
 	}
 
 	private async setDeviceInfoStates(resolvedDevice: ResolvedDevice): Promise<void> {
@@ -1191,6 +1231,17 @@ class DreoCloud extends utils.Adapter {
 				default:
 					return undefined;
 			}
+		}
+
+		if (channelId === 'fan' && stateId === 'oscillationMode') {
+			const oscillationMode = normalizeWritableDirectionalOscillationMode(value);
+
+			if (oscillationMode === undefined) {
+				throw new Error(`Invalid directional oscillation mode: ${String(value)}`);
+			}
+
+			await device.setDirectionalOscillationMode(oscillationMode);
+			return oscillationMode;
 		}
 
 		if (channelId === 'settings' && stateId === 'mute') {
