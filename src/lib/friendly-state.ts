@@ -1,4 +1,5 @@
 import type {
+	DreoDirectionalOscillationConfiguration,
 	DreoDirectionalOscillationMode,
 	DreoSceneConfiguration,
 	DreoTimerConfiguration,
@@ -115,6 +116,68 @@ export function normalizeWritableDirectionalOscillationMode(
 	}
 
 	return normalizeDirectionalOscillationMode(value);
+}
+
+/**
+ * Reads the effective angle of one directional oscillation axis.
+ *
+ * Non-preset values reported by the DREO app remain readable. Writing is
+ * deliberately restricted separately to the confirmed quick presets.
+ *
+ * @param configuration The parsed native cruise configuration.
+ * @param axis The requested horizontal or vertical axis.
+ * @returns A positive whole-number angle, or undefined for invalid data.
+ */
+export function normalizeDirectionalOscillationAngle(
+	configuration: DreoDirectionalOscillationConfiguration | undefined,
+	axis: 'horizontal' | 'vertical',
+): number | undefined {
+	if (!configuration) {
+		return undefined;
+	}
+
+	const angle = axis === 'horizontal' ? configuration.horizontalAngle : configuration.verticalAngle;
+
+	if (typeof angle !== 'number' || !Number.isFinite(angle) || !Number.isInteger(angle) || angle <= 0) {
+		return undefined;
+	}
+
+	return angle;
+}
+
+/**
+ * Converts an ioBroker-compatible value into a confirmed directional
+ * oscillation-angle quick preset.
+ *
+ * Numbers and numeric strings are accepted. Only 30, 60, 90, and 120
+ * degrees are writable.
+ *
+ * @param value The requested angle.
+ * @returns A confirmed preset, or undefined.
+ */
+export function normalizeWritableDirectionalOscillationAngle(value: unknown): 30 | 60 | 90 | 120 | undefined {
+	let normalizedValue = value;
+
+	if (typeof value === 'string') {
+		const trimmedValue = value.trim();
+
+		if (trimmedValue.length === 0) {
+			return undefined;
+		}
+
+		normalizedValue = Number(trimmedValue);
+	}
+
+	if (
+		typeof normalizedValue !== 'number' ||
+		!Number.isFinite(normalizedValue) ||
+		!Number.isInteger(normalizedValue) ||
+		![30, 60, 90, 120].includes(normalizedValue)
+	) {
+		return undefined;
+	}
+
+	return normalizedValue as 30 | 60 | 90 | 120;
 }
 
 /**

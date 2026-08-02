@@ -16,12 +16,14 @@ import { validateConfig } from './lib/config';
 import {
 	getConfiguredSleepLightDurationMinutes,
 	isDirectionalOscillationModel,
+	normalizeDirectionalOscillationAngle,
 	normalizeDirectionalOscillationMode,
 	normalizePowerScopedLevelOnState,
 	normalizePowerScopedOnState,
 	normalizePowerTimerValue,
 	normalizeSleepLightSceneValue,
 	normalizeWritableBoolean,
+	normalizeWritableDirectionalOscillationAngle,
 	normalizeWritableDirectionalOscillationMode,
 	selectDisplayRawKey,
 } from './lib/friendly-state';
@@ -101,6 +103,46 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 			1: 'Horizontal',
 			2: 'Vertical',
 			3: 'Horizontal and vertical',
+		},
+	},
+	{
+		channelId: 'fan',
+		path: ['fan', 'oscillation', 'horizontalAngle'],
+		channelNames: ['Fan', 'Oscillation'],
+		stateId: 'horizontalAngle',
+		stateName: 'Horizontal oscillation angle',
+		rawKey: 'cruiseconf',
+		type: 'number',
+		role: 'value',
+		unit: '°',
+		min: 30,
+		max: 120,
+		step: 30,
+		states: {
+			30: '30°',
+			60: '60°',
+			90: '90°',
+			120: '120°',
+		},
+	},
+	{
+		channelId: 'fan',
+		path: ['fan', 'oscillation', 'verticalAngle'],
+		channelNames: ['Fan', 'Oscillation'],
+		stateId: 'verticalAngle',
+		stateName: 'Vertical oscillation angle',
+		rawKey: 'cruiseconf',
+		type: 'number',
+		role: 'value',
+		unit: '°',
+		min: 30,
+		max: 120,
+		step: 30,
+		states: {
+			30: '30°',
+			60: '60°',
+			90: '90°',
+			120: '120°',
 		},
 	},
 	{
@@ -611,6 +653,7 @@ class DreoCloud extends utils.Adapter {
 		const createdChannelPaths = new Set<string>();
 
 		await this.migrateLegacyTimerStateObjects(deviceId, definitions);
+		await this.reconcileDirectionalOscillationFriendlyObjects(deviceId, definitions);
 
 		for (const definition of definitions) {
 			const channelPathParts = definition.path.slice(0, -1);
@@ -677,6 +720,59 @@ class DreoCloud extends utils.Adapter {
 			await this.delObjectAsync(objectId);
 
 			this.log.info(`Migrated legacy timer state ${objectId} to a channel.`);
+		}
+	}
+
+	private async reconcileDirectionalOscillationFriendlyObjects(
+		deviceId: string,
+		definitions: readonly FriendlyStateDefinition[],
+	): Promise<void> {
+		const availablePaths = new Set(
+			definitions
+				.filter(definition => this.isDirectionalOscillationFriendlyState(definition))
+				.map(definition => definition.path.join('.')),
+		);
+
+		const directionalStatePaths = [
+			'fan.oscillationMode',
+			'fan.oscillation.horizontalAngle',
+			'fan.oscillation.verticalAngle',
+		] as const;
+
+		for (const relativePath of directionalStatePaths) {
+			if (availablePaths.has(relativePath)) {
+				continue;
+			}
+
+			const objectId = `devices.${deviceId}.${relativePath}`;
+			const existingObject = await this.getObjectAsync(objectId);
+
+			if (!existingObject) {
+				continue;
+			}
+
+			const existingState = await this.getStateAsync(objectId);
+
+			if (existingState) {
+				await this.delStateAsync(objectId);
+			}
+
+			await this.delObjectAsync(objectId);
+			this.log.info(`Removed unavailable directional oscillation Friendly State ${objectId}.`);
+		}
+
+		const hasAngleStates = Array.from(availablePaths).some(path => path.startsWith('fan.oscillation.'));
+
+		if (hasAngleStates) {
+			return;
+		}
+
+		const channelId = `devices.${deviceId}.fan.oscillation`;
+		const existingChannel = await this.getObjectAsync(channelId);
+
+		if (existingChannel?.type === 'channel') {
+			await this.delObjectAsync(channelId);
+			this.log.info(`Removed unavailable directional oscillation channel ${channelId}.`);
 		}
 	}
 
@@ -761,8 +857,14 @@ class DreoCloud extends utils.Adapter {
 				return false;
 			}
 
-			if (definition.channelId === 'fan' && definition.stateId === 'oscillationMode') {
-				return isDirectionalOscillationModel(resolvedDevice.device.model);
+			if (this.isDirectionalOscillationFriendlyState(definition)) {
+				if (!isDirectionalOscillationModel(resolvedDevice.device.model)) {
+					return false;
+				}
+
+				if (definition.stateId !== 'oscillationMode' && !availableRawKeys.has('oscmode')) {
+					return false;
+				}
 			}
 
 			if (definition.channelId === 'mainLight') {
@@ -814,6 +916,19 @@ class DreoCloud extends utils.Adapter {
 			return normalizeDirectionalOscillationMode(mode);
 		}
 
+		if (
+			definition.channelId === 'fan' &&
+			(definition.stateId === 'horizontalAngle' || definition.stateId === 'verticalAngle')
+		) {
+			const configuration = this.client?.getDevice(resolvedDevice.device.sn)?.state
+				.directionalOscillationConfiguration;
+
+			return normalizeDirectionalOscillationAngle(
+				configuration,
+				definition.stateId === 'horizontalAngle' ? 'horizontal' : 'vertical',
+			);
+		}
+
 		if (definition.rawKey === 'rgblevel' || definition.rawKey === 'ledlevel') {
 			const powerValue = this.readRawStateValue(resolvedDevice, 'poweron');
 
@@ -843,12 +958,21 @@ class DreoCloud extends utils.Adapter {
 		return definition.stateId === 'on' && ['fan', 'mainLight', 'display', 'rgb'].includes(definition.channelId);
 	}
 
+	private isDirectionalOscillationFriendlyState(definition: FriendlyStateDefinition): boolean {
+		return (
+			definition.channelId === 'fan' &&
+			['oscillationMode', 'horizontalAngle', 'verticalAngle'].includes(definition.stateId)
+		);
+	}
+
 	private isWritableFriendlyStateDefinition(definition: FriendlyStateDefinition): boolean {
 		const writableStates = new Set<string>([
 			'power.on',
 			'fan.on',
 			'fan.speed',
 			'fan.oscillationMode',
+			'fan.horizontalAngle',
+			'fan.verticalAngle',
 			'mainLight.on',
 			'mainLight.brightness',
 			'mainLight.colorTemperature',
@@ -874,7 +998,7 @@ class DreoCloud extends utils.Adapter {
 			return false;
 		}
 
-		if (definition.channelId === 'fan' && definition.stateId === 'oscillationMode') {
+		if (this.isDirectionalOscillationFriendlyState(definition)) {
 			return isDirectionalOscillationModel(resolvedDevice.device.model);
 		}
 
@@ -1132,6 +1256,19 @@ class DreoCloud extends utils.Adapter {
 			return;
 		}
 
+		const availableDefinitions = this.getAvailableFriendlyStateDefinitions(resolvedDevice);
+		const definitionIsAvailable = availableDefinitions.includes(parsedStateId.definition);
+		const definitionIsWritable = this.isWritableFriendlyStateForDevice(parsedStateId.definition, resolvedDevice);
+
+		if (!definitionIsAvailable || !definitionIsWritable) {
+			this.log.warn(
+				`Rejected unavailable DREO Friendly-State write ${parsedStateId.definition.path.join(
+					'.',
+				)} for ${resolvedDevice.device.deviceName}.`,
+			);
+			return;
+		}
+
 		const device = this.client.getDevice(resolvedDevice.device.sn);
 
 		if (!device) {
@@ -1244,6 +1381,22 @@ class DreoCloud extends utils.Adapter {
 			return oscillationMode;
 		}
 
+		if (channelId === 'fan' && (stateId === 'horizontalAngle' || stateId === 'verticalAngle')) {
+			const angle = normalizeWritableDirectionalOscillationAngle(value);
+
+			if (angle === undefined) {
+				throw new Error(`Invalid directional oscillation angle preset: ${String(value)}`);
+			}
+
+			if (stateId === 'horizontalAngle') {
+				await device.setHorizontalOscillationAngle(angle);
+			} else {
+				await device.setVerticalOscillationAngle(angle);
+			}
+
+			return angle;
+		}
+
 		if (channelId === 'settings' && stateId === 'mute') {
 			const booleanValue = normalizeWritableBoolean(value);
 
@@ -1323,7 +1476,9 @@ class DreoCloud extends utils.Adapter {
 		return undefined;
 	}
 
-	private parseFriendlyStateId(id: string): { deviceId: string; channelId: string; stateId: string } | undefined {
+	private parseFriendlyStateId(
+		id: string,
+	): { deviceId: string; channelId: string; stateId: string; definition: FriendlyStateDefinition } | undefined {
 		const namespacePrefix = `${this.namespace}.`;
 		const relativeId = id.startsWith(namespacePrefix) ? id.slice(namespacePrefix.length) : id;
 
@@ -1348,6 +1503,7 @@ class DreoCloud extends utils.Adapter {
 			deviceId,
 			channelId: definition.channelId,
 			stateId: definition.stateId,
+			definition,
 		};
 	}
 

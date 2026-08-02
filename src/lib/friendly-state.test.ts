@@ -3,12 +3,14 @@ import { expect } from 'chai';
 import {
 	getConfiguredSleepLightDurationMinutes,
 	isDirectionalOscillationModel,
+	normalizeDirectionalOscillationAngle,
 	normalizeDirectionalOscillationMode,
 	normalizePowerScopedLevelOnState,
 	normalizePowerScopedOnState,
 	normalizePowerTimerValue,
 	normalizeSleepLightSceneValue,
 	normalizeWritableBoolean,
+	normalizeWritableDirectionalOscillationAngle,
 	normalizeWritableDirectionalOscillationMode,
 	selectDisplayRawKey,
 } from './friendly-state';
@@ -105,6 +107,90 @@ describe('normalizeWritableDirectionalOscillationMode', () => {
 		expect(normalizeWritableDirectionalOscillationMode(-1)).to.equal(undefined);
 		expect(normalizeWritableDirectionalOscillationMode(4)).to.equal(undefined);
 		expect(normalizeWritableDirectionalOscillationMode(null)).to.equal(undefined);
+	});
+});
+
+describe('normalizeDirectionalOscillationAngle', () => {
+	const configuration = {
+		verticalUpper: 70,
+		horizontalRight: 50,
+		verticalLower: -30,
+		horizontalLeft: -50,
+		horizontalAngle: 100,
+		verticalAngle: 100,
+	};
+
+	it('reads horizontal and vertical preset or custom angles independently', () => {
+		expect(normalizeDirectionalOscillationAngle(configuration, 'horizontal')).to.equal(100);
+		expect(normalizeDirectionalOscillationAngle(configuration, 'vertical')).to.equal(100);
+
+		expect(
+			normalizeDirectionalOscillationAngle(
+				{
+					...configuration,
+					horizontalAngle: 60,
+					verticalAngle: 30,
+				},
+				'horizontal',
+			),
+		).to.equal(60);
+
+		expect(
+			normalizeDirectionalOscillationAngle(
+				{
+					...configuration,
+					horizontalAngle: 60,
+					verticalAngle: 30,
+				},
+				'vertical',
+			),
+		).to.equal(30);
+	});
+
+	it('rejects missing or malformed angle values', () => {
+		expect(normalizeDirectionalOscillationAngle(undefined, 'horizontal')).to.equal(undefined);
+
+		expect(
+			normalizeDirectionalOscillationAngle(
+				{
+					...configuration,
+					horizontalAngle: 0,
+				},
+				'horizontal',
+			),
+		).to.equal(undefined);
+
+		expect(
+			normalizeDirectionalOscillationAngle(
+				{
+					...configuration,
+					verticalAngle: 30.5,
+				},
+				'vertical',
+			),
+		).to.equal(undefined);
+	});
+});
+
+describe('normalizeWritableDirectionalOscillationAngle', () => {
+	it('accepts the four confirmed presets as numbers and numeric strings', () => {
+		for (const angle of [30, 60, 90, 120] as const) {
+			expect(normalizeWritableDirectionalOscillationAngle(angle)).to.equal(angle);
+			expect(normalizeWritableDirectionalOscillationAngle(String(angle))).to.equal(angle);
+		}
+
+		expect(normalizeWritableDirectionalOscillationAngle(' 60 ')).to.equal(60);
+	});
+
+	it('rejects custom app angles, fractions, malformed values, and values outside the presets', () => {
+		expect(normalizeWritableDirectionalOscillationAngle(100)).to.equal(undefined);
+		expect(normalizeWritableDirectionalOscillationAngle('100')).to.equal(undefined);
+		expect(normalizeWritableDirectionalOscillationAngle(30.5)).to.equal(undefined);
+		expect(normalizeWritableDirectionalOscillationAngle('')).to.equal(undefined);
+		expect(normalizeWritableDirectionalOscillationAngle('horizontal')).to.equal(undefined);
+		expect(normalizeWritableDirectionalOscillationAngle(0)).to.equal(undefined);
+		expect(normalizeWritableDirectionalOscillationAngle(150)).to.equal(undefined);
+		expect(normalizeWritableDirectionalOscillationAngle(null)).to.equal(undefined);
 	});
 });
 
