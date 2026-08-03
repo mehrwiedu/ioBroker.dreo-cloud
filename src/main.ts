@@ -29,6 +29,7 @@ import {
 	selectDisplayRawKey,
 } from './lib/friendly-state';
 import { formatDiscoveredRawKeysMessage } from './lib/raw-state';
+import { isWritableSettingsStateId, writeSettingsBooleanState } from './lib/settings-write';
 
 interface FriendlyStateDefinition {
 	channelId: string;
@@ -985,10 +986,12 @@ class DreoCloud extends utils.Adapter {
 			'sleepLight.duration',
 			'powerOnTimer.duration',
 			'powerOffTimer.duration',
-			'settings.mute',
 		]);
 
-		return writableStates.has(`${definition.channelId}.${definition.stateId}`);
+		return (
+			writableStates.has(`${definition.channelId}.${definition.stateId}`) ||
+			(definition.channelId === 'settings' && isWritableSettingsStateId(definition.stateId))
+		);
 	}
 
 	private isWritableFriendlyStateForDevice(
@@ -1493,15 +1496,8 @@ class DreoCloud extends utils.Adapter {
 			return angle;
 		}
 
-		if (channelId === 'settings' && stateId === 'mute') {
-			const booleanValue = normalizeWritableBoolean(value);
-
-			if (booleanValue === undefined) {
-				throw new Error(`Invalid boolean value: ${String(value)}`);
-			}
-
-			await device.setMute(booleanValue);
-			return booleanValue;
+		if (channelId === 'settings' && isWritableSettingsStateId(stateId)) {
+			return writeSettingsBooleanState(device, stateId, value);
 		}
 
 		const numberValue = this.normalizeWritableNumber(value);
