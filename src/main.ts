@@ -13,6 +13,7 @@ import {
 } from '@mehrwiedu/dreo-api';
 
 import { validateConfig } from './lib/config';
+import { getConfirmedFanModeMetadata, isWritableFanModeModel, writeFanModeState } from './lib/fan-mode';
 import {
 	getConfiguredSleepLightDurationMinutes,
 	isDirectionalOscillationModel,
@@ -788,9 +789,13 @@ class DreoCloud extends utils.Adapter {
 		const discoveredState = resolvedDevice.states.find(state => state.key === definition.rawKey);
 		const numberConstraint =
 			discoveredState?.constraint?.type === 'number' ? discoveredState.constraint : undefined;
-		const minimum = definition.min ?? numberConstraint?.min;
-		const maximum = definition.max ?? numberConstraint?.max;
-		const step = definition.step ?? numberConstraint?.step;
+		const fanModeMetadata = this.isFanModeFriendlyState(definition)
+			? getConfirmedFanModeMetadata(resolvedDevice.device.model)
+			: undefined;
+		const minimum = fanModeMetadata?.min ?? definition.min ?? numberConstraint?.min;
+		const maximum = fanModeMetadata?.max ?? definition.max ?? numberConstraint?.max;
+		const step = fanModeMetadata?.step ?? definition.step ?? numberConstraint?.step;
+		const states = fanModeMetadata?.states ?? definition.states;
 
 		await this.setObjectAsync(objectId, {
 			type: 'state',
@@ -804,7 +809,7 @@ class DreoCloud extends utils.Adapter {
 				...(minimum !== undefined ? { min: minimum } : {}),
 				...(maximum !== undefined ? { max: maximum } : {}),
 				...(step !== undefined ? { step } : {}),
-				...(definition.states ? { states: definition.states } : {}),
+				...(states ? { states } : {}),
 			},
 			native: {
 				rawKey: definition.rawKey,
@@ -960,6 +965,10 @@ class DreoCloud extends utils.Adapter {
 		return definition.stateId === 'on' && ['fan', 'mainLight', 'display', 'rgb'].includes(definition.channelId);
 	}
 
+	private isFanModeFriendlyState(definition: FriendlyStateDefinition): boolean {
+		return definition.channelId === 'fan' && definition.stateId === 'mode';
+	}
+
 	private isDirectionalOscillationFriendlyState(definition: FriendlyStateDefinition): boolean {
 		return (
 			definition.channelId === 'fan' &&
@@ -972,6 +981,7 @@ class DreoCloud extends utils.Adapter {
 			'power.on',
 			'fan.on',
 			'fan.speed',
+			'fan.mode',
 			'fan.oscillationMode',
 			'fan.horizontalAngle',
 			'fan.verticalAngle',
@@ -1000,6 +1010,10 @@ class DreoCloud extends utils.Adapter {
 	): boolean {
 		if (!this.isWritableFriendlyStateDefinition(definition)) {
 			return false;
+		}
+
+		if (this.isFanModeFriendlyState(definition)) {
+			return isWritableFanModeModel(resolvedDevice.device.model);
 		}
 
 		if (this.isDirectionalOscillationFriendlyState(definition)) {
@@ -1467,6 +1481,10 @@ class DreoCloud extends utils.Adapter {
 				default:
 					return undefined;
 			}
+		}
+
+		if (channelId === 'fan' && stateId === 'mode') {
+			return writeFanModeState(device, value);
 		}
 
 		if (channelId === 'fan' && stateId === 'oscillationMode') {
