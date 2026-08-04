@@ -359,6 +359,43 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		role: 'switch.lock',
 	},
 	{
+		channelId: 'settings',
+		path: ['settings', 'filterInstalled'],
+		channelNames: ['Settings'],
+		stateId: 'filterInstalled',
+		stateName: 'Filter installed',
+		rawKey: 'filteron',
+		type: 'boolean',
+		role: 'switch',
+	},
+	{
+		channelId: 'info',
+		path: ['info', 'filterLifeRemaining'],
+		channelNames: ['Device information'],
+		stateId: 'filterLifeRemaining',
+		stateName: 'Filter life remaining',
+		rawKey: 'filtertime',
+		type: 'number',
+		role: 'value',
+		unit: '%',
+		min: 0,
+		max: 100,
+		step: 1,
+	},
+	{
+		channelId: 'info',
+		path: ['info', 'operatingHours'],
+		channelNames: ['Device information'],
+		stateId: 'operatingHours',
+		stateName: 'Operating hours',
+		rawKey: 'worktime',
+		type: 'number',
+		role: 'value.interval',
+		unit: 'h',
+		min: 0,
+		step: 1,
+	},
+	{
 		channelId: 'powerOnTimer',
 		path: ['timer', 'on', 'duration'],
 		channelNames: ['Timer', 'Power-on timer'],
@@ -928,6 +965,15 @@ class DreoCloud extends utils.Adapter {
 				return false;
 			}
 
+			if (
+				(definition.rawKey === 'filteron' ||
+					definition.rawKey === 'filtertime' ||
+					definition.rawKey === 'worktime') &&
+				resolvedDevice.device.model !== 'DR-HHM001S'
+			) {
+				return false;
+			}
+
 			if (this.isDirectionalOscillationFriendlyState(definition)) {
 				if (!isDirectionalOscillationModel(resolvedDevice.device.model)) {
 					return false;
@@ -1090,6 +1136,10 @@ class DreoCloud extends utils.Adapter {
 
 		if (this.isHumidifierFriendlyState(definition)) {
 			return isWritableHumidifierModel(resolvedDevice.device.model);
+		}
+
+		if (definition.channelId === 'settings' && definition.stateId === 'filterInstalled') {
+			return resolvedDevice.device.model === 'DR-HHM001S';
 		}
 
 		if (this.isDirectionalOscillationFriendlyState(definition)) {

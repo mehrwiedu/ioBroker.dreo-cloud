@@ -1,6 +1,6 @@
 import { normalizeWritableBoolean } from './friendly-state';
 
-export type WritableSettingsStateId = 'mute' | 'childLock';
+export type WritableSettingsStateId = 'mute' | 'childLock' | 'filterInstalled';
 
 /**
  * Public SDK methods required by writable Friendly States in the settings
@@ -20,6 +20,13 @@ export interface WritableSettingsDevice {
 	 * @param enabled Whether the child lock should be enabled.
 	 */
 	setChildLock(enabled: boolean): Promise<void>;
+
+	/**
+	 * Confirms whether the humidifier filter is installed.
+	 *
+	 * @param enabled Whether the installed filter should be marked active.
+	 */
+	setHumidifierFilterInstalled(enabled: boolean): Promise<void>;
 }
 
 /**
@@ -30,7 +37,7 @@ export interface WritableSettingsDevice {
  * @returns Whether the state is writable.
  */
 export function isWritableSettingsStateId(stateId: string): stateId is WritableSettingsStateId {
-	return stateId === 'mute' || stateId === 'childLock';
+	return stateId === 'mute' || stateId === 'childLock' || stateId === 'filterInstalled';
 }
 
 /**
@@ -55,8 +62,10 @@ export async function writeSettingsBooleanState(
 
 	if (stateId === 'mute') {
 		await device.setMute(booleanValue);
-	} else {
+	} else if (stateId === 'childLock') {
 		await device.setChildLock(booleanValue);
+	} else {
+		await device.setHumidifierFilterInstalled(booleanValue);
 	}
 
 	return booleanValue;

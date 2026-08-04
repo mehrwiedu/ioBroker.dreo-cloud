@@ -3,7 +3,7 @@ import { expect } from 'chai';
 import { isWritableSettingsStateId, type WritableSettingsDevice, writeSettingsBooleanState } from './settings-write';
 
 interface RecordedCall {
-	method: 'setMute' | 'setChildLock';
+	method: 'setMute' | 'setChildLock' | 'setHumidifierFilterInstalled';
 	enabled: boolean;
 }
 
@@ -25,13 +25,22 @@ function createRecordingDevice(calls: RecordedCall[]): WritableSettingsDevice {
 
 			return Promise.resolve();
 		},
+		setHumidifierFilterInstalled: enabled => {
+			calls.push({
+				method: 'setHumidifierFilterInstalled',
+				enabled,
+			});
+
+			return Promise.resolve();
+		},
 	};
 }
 
 describe('isWritableSettingsStateId', () => {
-	it('accepts mute and child lock but rejects unknown settings', () => {
+	it('accepts confirmed writable settings but rejects unknown settings', () => {
 		expect(isWritableSettingsStateId('mute')).to.equal(true);
 		expect(isWritableSettingsStateId('childLock')).to.equal(true);
+		expect(isWritableSettingsStateId('filterInstalled')).to.equal(true);
 		expect(isWritableSettingsStateId('unknown')).to.equal(false);
 	});
 });
@@ -66,6 +75,25 @@ describe('writeSettingsBooleanState', () => {
 			{
 				method: 'setMute',
 				enabled: true,
+			},
+		]);
+	});
+
+	it('forwards filter confirmation only to the dedicated SDK method', async () => {
+		const calls: RecordedCall[] = [];
+		const device = createRecordingDevice(calls);
+
+		expect(await writeSettingsBooleanState(device, 'filterInstalled', true)).to.equal(true);
+		expect(await writeSettingsBooleanState(device, 'filterInstalled', '0')).to.equal(false);
+
+		expect(calls).to.deep.equal([
+			{
+				method: 'setHumidifierFilterInstalled',
+				enabled: true,
+			},
+			{
+				method: 'setHumidifierFilterInstalled',
+				enabled: false,
 			},
 		]);
 	});
