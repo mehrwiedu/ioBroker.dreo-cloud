@@ -14,6 +14,7 @@ import {
 
 import { validateConfig } from './lib/config';
 import { getConfirmedFanModeMetadata, isWritableFanModeModel, writeFanModeState } from './lib/fan-mode';
+import { isWritableHumidifierModel, writeHumidifierState } from './lib/humidifier-control';
 import {
 	getConfiguredSleepLightDurationMinutes,
 	isDirectionalOscillationModel,
@@ -88,6 +89,65 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		rawKey: 'mode',
 		type: 'number',
 		role: 'value',
+	},
+	{
+		channelId: 'humidifier',
+		path: ['humidifier', 'mode'],
+		channelNames: ['Humidifier'],
+		stateId: 'mode',
+		stateName: 'Mode',
+		rawKey: 'mode',
+		type: 'number',
+		role: 'value',
+		min: 0,
+		max: 2,
+		step: 1,
+		states: {
+			0: 'Manual',
+			1: 'Auto',
+			2: 'Sleep',
+		},
+	},
+	{
+		channelId: 'humidifier',
+		path: ['humidifier', 'fogLevel'],
+		channelNames: ['Humidifier'],
+		stateId: 'fogLevel',
+		stateName: 'Fog level',
+		rawKey: 'foglevel',
+		type: 'number',
+		role: 'level',
+		min: 1,
+		max: 6,
+		step: 1,
+	},
+	{
+		channelId: 'humidifier',
+		path: ['humidifier', 'autoTargetHumidity'],
+		channelNames: ['Humidifier'],
+		stateId: 'autoTargetHumidity',
+		stateName: 'Automatic target humidity',
+		rawKey: 'rhautolevel',
+		type: 'number',
+		role: 'level.humidity',
+		unit: '%',
+		min: 30,
+		max: 90,
+		step: 1,
+	},
+	{
+		channelId: 'humidifier',
+		path: ['humidifier', 'sleepTargetHumidity'],
+		channelNames: ['Humidifier'],
+		stateId: 'sleepTargetHumidity',
+		stateName: 'Sleep target humidity',
+		rawKey: 'rhsleeplevel',
+		type: 'number',
+		role: 'level.humidity',
+		unit: '%',
+		min: 30,
+		max: 90,
+		step: 1,
 	},
 	{
 		channelId: 'fan',
@@ -864,6 +924,10 @@ class DreoCloud extends utils.Adapter {
 				return false;
 			}
 
+			if (definition.channelId === 'humidifier' && !isWritableHumidifierModel(resolvedDevice.device.model)) {
+				return false;
+			}
+
 			if (this.isDirectionalOscillationFriendlyState(definition)) {
 				if (!isDirectionalOscillationModel(resolvedDevice.device.model)) {
 					return false;
@@ -969,6 +1033,10 @@ class DreoCloud extends utils.Adapter {
 		return definition.channelId === 'fan' && definition.stateId === 'mode';
 	}
 
+	private isHumidifierFriendlyState(definition: FriendlyStateDefinition): boolean {
+		return definition.channelId === 'humidifier';
+	}
+
 	private isDirectionalOscillationFriendlyState(definition: FriendlyStateDefinition): boolean {
 		return (
 			definition.channelId === 'fan' &&
@@ -982,6 +1050,10 @@ class DreoCloud extends utils.Adapter {
 			'fan.on',
 			'fan.speed',
 			'fan.mode',
+			'humidifier.mode',
+			'humidifier.fogLevel',
+			'humidifier.autoTargetHumidity',
+			'humidifier.sleepTargetHumidity',
 			'fan.oscillationMode',
 			'fan.horizontalAngle',
 			'fan.verticalAngle',
@@ -1014,6 +1086,10 @@ class DreoCloud extends utils.Adapter {
 
 		if (this.isFanModeFriendlyState(definition)) {
 			return isWritableFanModeModel(resolvedDevice.device.model);
+		}
+
+		if (this.isHumidifierFriendlyState(definition)) {
+			return isWritableHumidifierModel(resolvedDevice.device.model);
 		}
 
 		if (this.isDirectionalOscillationFriendlyState(definition)) {
@@ -1485,6 +1561,10 @@ class DreoCloud extends utils.Adapter {
 
 		if (channelId === 'fan' && stateId === 'mode') {
 			return writeFanModeState(device, value);
+		}
+
+		if (channelId === 'humidifier') {
+			return writeHumidifierState(device, stateId, value);
 		}
 
 		if (channelId === 'fan' && stateId === 'oscillationMode') {
