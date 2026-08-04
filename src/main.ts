@@ -13,6 +13,7 @@ import {
 } from '@mehrwiedu/dreo-api';
 
 import { validateConfig } from './lib/config';
+import { getConfirmedFanFavoriteMetadata, isWritableFanFavoriteModel, writeFanFavoriteState } from './lib/fan-favorite';
 import { getConfirmedFanModeMetadata, isWritableFanModeModel, writeFanModeState } from './lib/fan-mode';
 import { isWritableHumidifierModel, writeHumidifierState } from './lib/humidifier-control';
 import {
@@ -89,6 +90,27 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		rawKey: 'mode',
 		type: 'number',
 		role: 'value',
+	},
+	{
+		channelId: 'fan',
+		path: ['fan', 'favorite'],
+		channelNames: ['Fan'],
+		stateId: 'favorite',
+		stateName: 'Favorite',
+		rawKey: 'predefine',
+		type: 'number',
+		role: 'value',
+		min: 0,
+		max: 5,
+		step: 1,
+		states: {
+			0: 'None',
+			1: 'Favorite 1',
+			2: 'Favorite 2',
+			3: 'Favorite 3',
+			4: 'Favorite 4',
+			5: 'Favorite 5',
+		},
 	},
 	{
 		channelId: 'humidifier',
@@ -889,10 +911,13 @@ class DreoCloud extends utils.Adapter {
 		const fanModeMetadata = this.isFanModeFriendlyState(definition)
 			? getConfirmedFanModeMetadata(resolvedDevice.device.model)
 			: undefined;
-		const minimum = fanModeMetadata?.min ?? definition.min ?? numberConstraint?.min;
-		const maximum = fanModeMetadata?.max ?? definition.max ?? numberConstraint?.max;
-		const step = fanModeMetadata?.step ?? definition.step ?? numberConstraint?.step;
-		const states = fanModeMetadata?.states ?? definition.states;
+		const fanFavoriteMetadata = this.isFanFavoriteFriendlyState(definition)
+			? getConfirmedFanFavoriteMetadata(resolvedDevice.device.model)
+			: undefined;
+		const minimum = fanModeMetadata?.min ?? fanFavoriteMetadata?.min ?? definition.min ?? numberConstraint?.min;
+		const maximum = fanModeMetadata?.max ?? fanFavoriteMetadata?.max ?? definition.max ?? numberConstraint?.max;
+		const step = fanModeMetadata?.step ?? fanFavoriteMetadata?.step ?? definition.step ?? numberConstraint?.step;
+		const states = fanModeMetadata?.states ?? fanFavoriteMetadata?.states ?? definition.states;
 
 		await this.setObjectAsync(objectId, {
 			type: 'state',
@@ -962,6 +987,13 @@ class DreoCloud extends utils.Adapter {
 			}
 
 			if (definition.channelId === 'humidifier' && !isWritableHumidifierModel(resolvedDevice.device.model)) {
+				return false;
+			}
+
+			if (
+				this.isFanFavoriteFriendlyState(definition) &&
+				!isWritableFanFavoriteModel(resolvedDevice.device.model)
+			) {
 				return false;
 			}
 
@@ -1079,6 +1111,10 @@ class DreoCloud extends utils.Adapter {
 		return definition.channelId === 'fan' && definition.stateId === 'mode';
 	}
 
+	private isFanFavoriteFriendlyState(definition: FriendlyStateDefinition): boolean {
+		return definition.channelId === 'fan' && definition.stateId === 'favorite';
+	}
+
 	private isHumidifierFriendlyState(definition: FriendlyStateDefinition): boolean {
 		return definition.channelId === 'humidifier';
 	}
@@ -1096,6 +1132,7 @@ class DreoCloud extends utils.Adapter {
 			'fan.on',
 			'fan.speed',
 			'fan.mode',
+			'fan.favorite',
 			'humidifier.mode',
 			'humidifier.fogLevel',
 			'humidifier.autoTargetHumidity',
@@ -1132,6 +1169,10 @@ class DreoCloud extends utils.Adapter {
 
 		if (this.isFanModeFriendlyState(definition)) {
 			return isWritableFanModeModel(resolvedDevice.device.model);
+		}
+
+		if (this.isFanFavoriteFriendlyState(definition)) {
+			return isWritableFanFavoriteModel(resolvedDevice.device.model);
 		}
 
 		if (this.isHumidifierFriendlyState(definition)) {
@@ -1611,6 +1652,10 @@ class DreoCloud extends utils.Adapter {
 
 		if (channelId === 'fan' && stateId === 'mode') {
 			return writeFanModeState(device, value);
+		}
+
+		if (channelId === 'fan' && stateId === 'favorite') {
+			return writeFanFavoriteState(device, value);
 		}
 
 		if (channelId === 'humidifier') {
