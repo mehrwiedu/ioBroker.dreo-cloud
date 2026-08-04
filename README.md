@@ -7,88 +7,84 @@
 ![Number of Installations](https://iobroker.live/badges/dreo-cloud-installed.svg)
 ![Current version in stable repository](https://iobroker.live/badges/dreo-cloud-stable.svg)
 
-[![NPM](https://nodei.co/npm/iobroker.dreo-cloud.png?downloads=true)](https://nodei.co/npm/iobroker.dreo-cloud/)
-
 **Tests:** ![Test and Release](https://github.com/mehrwiedu/ioBroker.dreo-cloud/workflows/Test%20and%20Release/badge.svg)
 
 ## DREO Cloud adapter for ioBroker
 
-Unofficial ioBroker adapter for selected DREO cloud-connected smart home devices.
+Unofficial ioBroker adapter for selected DREO cloud-connected devices.
 
 > This project is not affiliated with, endorsed by, or supported by DREO.
 
 ## Current status
 
-This adapter is under active development and currently intended for testing.
+The adapter is under active development and intended for controlled testing.
 
-Implemented functionality includes:
+Current development version: `0.1.2-beta.1`.
 
-- device discovery through the DREO FamilyTree
+Implemented:
+
+- FamilyTree-based device discovery
 - runtime discovery of newly available devices
-- live state updates through the DREO WebSocket connection
-- automatic creation of device, information, raw, and friendly states
-- read-only visibility for previously unknown raw states
-- bidirectional control of supported functions
-- automatic re-login and WebSocket reconnect after renewed DREO sessions
-- effective friendly on/off states while preserving the original raw device state
+- initial state loading
+- live WebSocket updates
+- automatic raw and friendly object creation
+- dynamic read-only creation of newly observed raw keys
+- bidirectional control of confirmed functions
+- automatic session renewal and WebSocket reconnect
+- effective friendly states
+- central write acknowledgement and failure reconciliation
 
-The adapter uses the public TypeScript SDK:
+The adapter uses:
 
 ```text
 @mehrwiedu/dreo-api
 ```
 
-DREO-specific command and dependency logic remains inside the SDK. The ioBroker adapter acts as the integration layer.
+DREO protocol details and native command logic remain inside the SDK.
 
 ## Tested devices
 
-| Model        | Device type | Tested quantity | Tested functionality                                                                         |
-| ------------ | ----------- | --------------: | -------------------------------------------------------------------------------------------- |
-| `DR-HCF007S` | Ceiling fan |               3 | Power, fan, speed, main light, brightness, color temperature, atmosphere light, live updates |
-| `DR-HPF002S` | Stand fan   |               1 | Power, fan, speed, display state, live updates                                               |
-| `DR-HHM001S` | Humidifier  |               1 | Discovery, raw states, power, timers, live updates                                           |
+| Model | Type | Quantity | Validated areas |
+|---|---|---:|---|
+| `DR-HCF007S` | Ceiling fan | 3 | Fan, modes, main light, brightness, color temperature, atmosphere light, timers, child lock and live updates |
+| `DR-HCF001S` | Ceiling fan | 1 | Components without `poweron`, modes, timers and live updates |
+| `DR-HPF002S` | Stand fan | 1 | Fan, modes, display, directional oscillation, independent axis angles and live updates |
+| `DR-HHM001S` | Humidifier | 1 | Power, modes, fog level, target humidity, indicators, filter state, operating information, timers and live updates |
 
-Other DREO devices may be discovered and exposed through raw states, but they are not automatically considered fully supported.
+Other devices may appear through raw states but are not automatically considered fully supported.
 
-## Important account setup
+## Account setup
 
-The adapter currently requires a separate DREO account created with an email address and password.
+Use a separate DREO account that supports email/password login.
 
-1. Keep the devices and home assigned to the primary DREO account.
-2. Create a second DREO account using email and password login.
-3. Share the DREO home from the primary account with the second account.
-4. Enter the credentials of the second account in the adapter configuration.
+1. Keep the devices in the primary owner account.
+2. Create a secondary email/password account.
+3. Share the DREO home with that account.
+4. Configure the adapter with the secondary account.
 
-This setup is required because discovery uses the FamilyTree visible to the invited account.
-
-Accounts that can only sign in through Apple or Google are currently not supported.
+Apple and Google login are not supported.
 
 ## Configuration
 
-Configure the adapter instance with:
-
-- DREO email address
+- DREO email
 - DREO password
-- cloud region:
-    - EU
-    - US
+- region: EU or US
 
 The password is stored as an encrypted and protected ioBroker native setting.
 
 ## Object structure
 
-Each discovered device is exposed below:
-
 ```text
 dreo-cloud.0.devices.<deviceId>
 ```
 
-Depending on the device and its supported states, the tree can include:
+Possible branches:
 
 ```text
 info
 power
 fan
+humidifier
 light.main
 light.atmosphere
 display
@@ -97,98 +93,102 @@ timer
 raw
 ```
 
-The `raw` branch mirrors the original DREO state as closely as possible and is read-only.
-
-Friendly states provide user-oriented names and effective operating states. For example, a fan can retain `raw.fanon=true` while the device is powered off. In that case, the friendly `fan.on` state is shown as `false` until power is enabled again.
+The `raw` branch mirrors DREO values and is read-only.
 
 ## Supported controls
 
-Where supported by the device, writable friendly states currently include:
+The exact set depends on the device.
+
+Common controls include:
 
 ```text
 power.on
 fan.on
 fan.speed
+fan.mode
+settings.mute
+settings.childLock
 light.main.on
 light.main.brightness
 light.main.colorTemperature
-display.on
 light.atmosphere.on
 light.atmosphere.brightness
+display.on
+timer.*
 ```
 
-Changing a level can automatically activate its related function and the device power. This dependency logic is handled by the SDK.
-
-## Installation
-
-The adapter is not yet part of the official ioBroker repository.
-
-For testing, it can be installed from GitHub after the repository has been published:
+Model-specific controls include:
 
 ```text
-https://github.com/mehrwiedu/ioBroker.dreo-cloud
+fan.oscillationMode
+fan.oscillation.horizontalAngle
+fan.oscillation.verticalAngle
+humidifier.mode
+humidifier.fogLevel
+humidifier.autoTargetHumidity
+humidifier.sleepTargetHumidity
+settings.filterInstalled
 ```
+
+Read-only operating information includes filter life and operating hours where reported.
+
+## Write behavior
+
+Writes are routed to public SDK methods.
+
+- The adapter does not construct native DREO payloads.
+- Identical successful writes are acknowledged immediately.
+- Rejected writes are restored to the last confirmed value.
+- Actual changes remain pending until confirmed by the device report where required.
+- Failed DREO `control-reply` messages are surfaced as SDK errors.
+
+## Deliberately unsupported
+
+Ceiling-fan favorites based on raw `predefine` values are not writable.
+
+Real-device testing showed that writing the slot did not execute the stored scene. Numeric writes were rejected by the cloud. `raw.predefine` therefore remains read-only.
+
+Unverified fields such as `fixedconf` and additional RGB effects also remain raw-only.
 
 ## Cloud dependency
 
-This adapter communicates with DREO cloud services and does not provide local-only control.
+The adapter depends on private DREO cloud APIs and does not provide local-only control.
 
 ## Privacy and security
 
-- Device data and commands are exchanged through the DREO cloud.
-- Use a dedicated secondary DREO account for the adapter.
-- Do not publish credentials, access tokens, device serial numbers, or unredacted diagnostic logs.
+- Do not publish credentials, tokens, device serial numbers or unredacted logs.
+- Prefer a dedicated secondary DREO account.
 - Review logs before attaching them to issues.
 
 ## Known limitations
 
 - Apple and Google login are not supported.
-- Only EU and US regions are currently available.
-- Not every raw DREO state has a friendly mapping.
-- Timer, schedule, oscillation, RGB effects, presets, and model-specific modes may be incomplete.
-- The humidifier currently has only the friendly mappings already validated in the adapter.
-- Newly discovered devices may initially expose mostly raw states until their functions are verified.
+- Only EU and US regions are available.
+- Not every raw state has a friendly mapping.
+- Real hot-add still needs a dedicated end-to-end validation run.
+- Friendly structures are not yet generated when a known key first appears only after initialization.
+- Partially shared homes/devices still require dedicated testing.
+- DREO can change the private API without notice.
 
 ## Development
 
-Requirements:
-
-- Node.js 22 or newer
-- npm
-
-Install dependencies:
-
 ```bash
 npm install
-```
-
-Run the checks:
-
-```bash
-npm run check
-npm run build
 npm test
+npm run check
 npm run lint
-```
-
-Test the adapter with dev-server:
-
-```bash
-npm run dev-server -- watch default
+npm run build
 ```
 
 ## Changelog
 
-<!--
-	Placeholder for the next version (at the beginning of the line):
-	### **WORK IN PROGRESS**
--->
-
 ### **WORK IN PROGRESS**
 
-- (mehrwiedu) Initial public development version
+- Updated device coverage and supported controls
+- Removed unverified ceiling-fan favorite control
+- Added control-reply error propagation through the SDK
 
-See [CHANGELOG.md](CHANGELOG.md) for the complete development history.
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
