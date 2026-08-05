@@ -12,6 +12,7 @@ import {
 	VERSION as dreoApiVersion,
 } from '@mehrwiedu/dreo-api';
 
+import { isConflictingGenericAirPurifierFriendlyState } from './lib/air-purifier';
 import { validateConfig } from './lib/config';
 import { getConfirmedFanModeMetadata, isWritableFanModeModel, writeFanModeState } from './lib/fan-mode';
 import { isWritableHumidifierModel, writeHumidifierState } from './lib/humidifier-control';
@@ -954,6 +955,10 @@ class DreoCloud extends utils.Adapter {
 
 		return FRIENDLY_STATE_DEFINITIONS.filter(definition => {
 			if (!availableRawKeys.has(definition.rawKey)) {
+				return false;
+			}
+
+			if (isConflictingGenericAirPurifierFriendlyState(resolvedDevice.device.model, definition)) {
 				return false;
 			}
 
