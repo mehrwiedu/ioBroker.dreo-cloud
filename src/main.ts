@@ -12,7 +12,13 @@ import {
 	VERSION as dreoApiVersion,
 } from '@mehrwiedu/dreo-api';
 
-import { isConflictingGenericAirPurifierFriendlyState } from './lib/air-purifier';
+import {
+	AIR_PURIFIER_MODE_STATES,
+	isAirPurifierModel,
+	isConflictingGenericAirPurifierFriendlyState,
+	normalizeAirPurifierMode,
+	writeAirPurifierModeState,
+} from './lib/air-purifier';
 import { validateConfig } from './lib/config';
 import { getConfirmedFanModeMetadata, isWritableFanModeModel, writeFanModeState } from './lib/fan-mode';
 import { isWritableHumidifierModel, writeHumidifierState } from './lib/humidifier-control';
@@ -90,6 +96,17 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		rawKey: 'mode',
 		type: 'number',
 		role: 'value',
+	},
+	{
+		channelId: 'airPurifier',
+		path: ['airPurifier', 'mode'],
+		channelNames: ['Air purifier'],
+		stateId: 'mode',
+		stateName: 'Operating mode',
+		rawKey: 'mode',
+		type: 'string',
+		role: 'value',
+		states: { ...AIR_PURIFIER_MODE_STATES },
 	},
 	{
 		channelId: 'humidifier',
@@ -962,6 +979,10 @@ class DreoCloud extends utils.Adapter {
 				return false;
 			}
 
+			if (definition.channelId === 'airPurifier' && !isAirPurifierModel(resolvedDevice.device.model)) {
+				return false;
+			}
+
 			if (definition.channelId === 'fan' && !hasFan) {
 				return false;
 			}
@@ -1032,6 +1053,12 @@ class DreoCloud extends utils.Adapter {
 			return normalizeSleepLightSceneValue(scene, definition.stateId);
 		}
 
+		if (definition.channelId === 'airPurifier' && definition.stateId === 'mode') {
+			const semanticMode = this.client?.getDevice(resolvedDevice.device.sn)?.state.airPurifierMode;
+
+			return normalizeAirPurifierMode(semanticMode ?? value);
+		}
+
 		if (definition.channelId === 'fan' && definition.stateId === 'oscillationMode') {
 			const mode = this.client?.getDevice(resolvedDevice.device.sn)?.state.directionalOscillationMode;
 
@@ -1084,6 +1111,10 @@ class DreoCloud extends utils.Adapter {
 		return definition.channelId === 'fan' && definition.stateId === 'mode';
 	}
 
+	private isAirPurifierFriendlyState(definition: FriendlyStateDefinition): boolean {
+		return definition.channelId === 'airPurifier';
+	}
+
 	private isHumidifierFriendlyState(definition: FriendlyStateDefinition): boolean {
 		return definition.channelId === 'humidifier';
 	}
@@ -1101,6 +1132,7 @@ class DreoCloud extends utils.Adapter {
 			'fan.on',
 			'fan.speed',
 			'fan.mode',
+			'airPurifier.mode',
 			'humidifier.mode',
 			'humidifier.fogLevel',
 			'humidifier.autoTargetHumidity',
@@ -1137,6 +1169,10 @@ class DreoCloud extends utils.Adapter {
 
 		if (this.isFanModeFriendlyState(definition)) {
 			return isWritableFanModeModel(resolvedDevice.device.model);
+		}
+
+		if (this.isAirPurifierFriendlyState(definition)) {
+			return isAirPurifierModel(resolvedDevice.device.model);
 		}
 
 		if (this.isHumidifierFriendlyState(definition)) {
@@ -1549,7 +1585,7 @@ class DreoCloud extends utils.Adapter {
 		channelId: string,
 		stateId: string,
 		value: ioBroker.StateValue,
-	): Promise<boolean | number | undefined> {
+	): Promise<boolean | number | string | undefined> {
 		if (stateId === 'on') {
 			const booleanValue = normalizeWritableBoolean(value);
 
@@ -1616,6 +1652,10 @@ class DreoCloud extends utils.Adapter {
 
 		if (channelId === 'fan' && stateId === 'mode') {
 			return writeFanModeState(device, value);
+		}
+
+		if (channelId === 'airPurifier' && stateId === 'mode') {
+			return writeAirPurifierModeState(device, value);
 		}
 
 		if (channelId === 'humidifier') {

@@ -1,3 +1,5 @@
+import { isDreoAirPurifierMode, type DreoAirPurifierMode } from '@mehrwiedu/dreo-api';
+
 /**
  * Minimal identity required to distinguish Friendly-State definitions whose
  * generic semantics conflict with the confirmed DR-HAP009S semantics.
@@ -21,6 +23,84 @@ export interface FriendlyStateIdentity {
  */
 export function isAirPurifierModel(model: unknown): boolean {
 	return model === 'DR-HAP009S';
+}
+
+/** Human-readable ioBroker labels for confirmed air-purifier modes. */
+export const AIR_PURIFIER_MODE_STATES: Readonly<Record<DreoAirPurifierMode, string>> = {
+	manual: 'Manual',
+	'auto-regular': 'Auto',
+	turbo: 'Turbo',
+	sleep: 'Sleep',
+};
+
+/**
+ * SDK surface required by the writable air-purifier mode Friendly State.
+ */
+export interface WritableAirPurifierModeDevice {
+	/** Reported DREO model identifier. */
+	readonly model: string;
+
+	/**
+	 * Sets the native air-purifier operating mode.
+	 *
+	 * @param mode Confirmed native DR-HAP009S mode.
+	 */
+	setAirPurifierMode(mode: DreoAirPurifierMode): Promise<void>;
+}
+
+/**
+ * Validates a semantic air-purifier mode read from the SDK state.
+ *
+ * Reported values are intentionally not trimmed or translated. Only exact
+ * confirmed native values are accepted.
+ *
+ * @param value Semantic SDK state value.
+ * @returns A confirmed mode, or undefined.
+ */
+export function normalizeAirPurifierMode(value: unknown): DreoAirPurifierMode | undefined {
+	return isDreoAirPurifierMode(value) ? value : undefined;
+}
+
+/**
+ * Normalizes an ioBroker write into a confirmed DR-HAP009S mode.
+ *
+ * Surrounding whitespace is accepted for user-entered string values. Numeric
+ * values, display labels and unsupported models are rejected.
+ *
+ * @param value Requested ioBroker state value.
+ * @param model Reported DREO model identifier.
+ * @returns A confirmed native mode, or undefined.
+ */
+export function normalizeWritableAirPurifierMode(value: unknown, model: unknown): DreoAirPurifierMode | undefined {
+	if (!isAirPurifierModel(model) || typeof value !== 'string') {
+		return undefined;
+	}
+
+	const normalizedValue = value.trim();
+
+	return isDreoAirPurifierMode(normalizedValue) ? normalizedValue : undefined;
+}
+
+/**
+ * Normalizes and forwards an air-purifier mode write to the public SDK.
+ *
+ * @param device Writable DREO air purifier.
+ * @param value Requested ioBroker state value.
+ * @returns The confirmed native mode forwarded to the SDK.
+ */
+export async function writeAirPurifierModeState(
+	device: WritableAirPurifierModeDevice,
+	value: unknown,
+): Promise<DreoAirPurifierMode> {
+	const mode = normalizeWritableAirPurifierMode(value, device.model);
+
+	if (mode === undefined) {
+		throw new Error(`Invalid air purifier mode for ${device.model}: ${String(value)}`);
+	}
+
+	await device.setAirPurifierMode(mode);
+
+	return mode;
 }
 
 /**

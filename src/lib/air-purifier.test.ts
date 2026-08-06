@@ -1,6 +1,14 @@
 import { expect } from 'chai';
 
-import { isAirPurifierModel, isConflictingGenericAirPurifierFriendlyState } from './air-purifier';
+import {
+	AIR_PURIFIER_MODE_STATES,
+	isAirPurifierModel,
+	isConflictingGenericAirPurifierFriendlyState,
+	normalizeAirPurifierMode,
+	normalizeWritableAirPurifierMode,
+	type WritableAirPurifierModeDevice,
+	writeAirPurifierModeState,
+} from './air-purifier';
 
 describe('DR-HAP009S generic Friendly-State separation', () => {
 	it('recognizes only the confirmed air-purifier model', () => {
@@ -106,5 +114,80 @@ describe('DR-HAP009S generic Friendly-State separation', () => {
 				}),
 			).to.equal(false);
 		}
+	});
+});
+
+describe('DR-HAP009S operating mode', () => {
+	it('exposes all four confirmed native modes with readable labels', () => {
+		expect(AIR_PURIFIER_MODE_STATES).to.deep.equal({
+			manual: 'Manual',
+			'auto-regular': 'Auto',
+			turbo: 'Turbo',
+			sleep: 'Sleep',
+		});
+	});
+
+	it('accepts only exact confirmed semantic read values', () => {
+		for (const mode of ['manual', 'auto-regular', 'turbo', 'sleep']) {
+			expect(normalizeAirPurifierMode(mode)).to.equal(mode);
+		}
+
+		expect(normalizeAirPurifierMode(' auto-regular ')).to.equal(undefined);
+		expect(normalizeAirPurifierMode('auto')).to.equal(undefined);
+		expect(normalizeAirPurifierMode(1)).to.equal(undefined);
+		expect(normalizeAirPurifierMode(null)).to.equal(undefined);
+	});
+
+	it('normalizes confirmed string writes only for DR-HAP009S', () => {
+		expect(normalizeWritableAirPurifierMode('manual', 'DR-HAP009S')).to.equal('manual');
+		expect(normalizeWritableAirPurifierMode(' auto-regular ', 'DR-HAP009S')).to.equal('auto-regular');
+		expect(normalizeWritableAirPurifierMode('turbo', 'DR-HAP009S')).to.equal('turbo');
+		expect(normalizeWritableAirPurifierMode('sleep', 'DR-HAP009S')).to.equal('sleep');
+
+		expect(normalizeWritableAirPurifierMode('auto', 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierMode('Auto', 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierMode('', 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierMode(1, 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierMode('manual', 'DR-HHM001S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierMode('manual', undefined)).to.equal(undefined);
+	});
+
+	it('forwards only the normalized mode to setAirPurifierMode', async () => {
+		const calls: string[] = [];
+		const device: WritableAirPurifierModeDevice = {
+			model: 'DR-HAP009S',
+			setAirPurifierMode: mode => {
+				calls.push(mode);
+
+				return Promise.resolve();
+			},
+		};
+
+		expect(await writeAirPurifierModeState(device, ' auto-regular ')).to.equal('auto-regular');
+		expect(await writeAirPurifierModeState(device, 'sleep')).to.equal('sleep');
+		expect(calls).to.deep.equal(['auto-regular', 'sleep']);
+	});
+
+	it('rejects invalid writes without calling the SDK', async () => {
+		const calls: string[] = [];
+		const device: WritableAirPurifierModeDevice = {
+			model: 'DR-HAP009S',
+			setAirPurifierMode: mode => {
+				calls.push(mode);
+
+				return Promise.resolve();
+			},
+		};
+		let caughtError: unknown;
+
+		try {
+			await writeAirPurifierModeState(device, 'auto');
+		} catch (error) {
+			caughtError = error;
+		}
+
+		expect(caughtError).to.be.instanceOf(Error);
+		expect((caughtError as Error).message).to.equal('Invalid air purifier mode for DR-HAP009S: auto');
+		expect(calls).to.deep.equal([]);
 	});
 });
