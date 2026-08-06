@@ -8,16 +8,22 @@ import {
 	normalizeAirPurifierMode,
 	normalizeAirPurifierMoodLightLevel,
 	normalizeAirPurifierWindLevel,
+	normalizeWritableAirPurifierDisplay,
 	normalizeWritableAirPurifierMode,
 	normalizeWritableAirPurifierMoodLight,
 	normalizeWritableAirPurifierMoodLightLevel,
+	normalizeWritableAirPurifierPowerRecovery,
 	normalizeWritableAirPurifierWindLevel,
+	type WritableAirPurifierDisplayDevice,
 	type WritableAirPurifierModeDevice,
 	type WritableAirPurifierMoodLightDevice,
+	type WritableAirPurifierPowerRecoveryDevice,
 	type WritableAirPurifierWindLevelDevice,
+	writeAirPurifierDisplayState,
 	writeAirPurifierModeState,
 	writeAirPurifierMoodLightLevelState,
 	writeAirPurifierMoodLightState,
+	writeAirPurifierPowerRecoveryState,
 	writeAirPurifierWindLevelState,
 } from './air-purifier';
 
@@ -29,7 +35,7 @@ describe('DR-HAP009S generic Friendly-State separation', () => {
 		expect(isAirPurifierModel(undefined)).to.equal(false);
 	});
 
-	it('blocks the three conflicting generic definitions for DR-HAP009S', () => {
+	it('blocks the conflicting generic definitions for DR-HAP009S', () => {
 		expect(
 			isConflictingGenericAirPurifierFriendlyState('DR-HAP009S', {
 				channelId: 'fan',
@@ -53,6 +59,16 @@ describe('DR-HAP009S generic Friendly-State separation', () => {
 				rawKey: 'rgblevel',
 			}),
 		).to.equal(true);
+
+		for (const rawKey of ['lighton', 'ledlevel']) {
+			expect(
+				isConflictingGenericAirPurifierFriendlyState('DR-HAP009S', {
+					channelId: 'display',
+					stateId: 'on',
+					rawKey,
+				}),
+			).to.equal(true);
+		}
 	});
 
 	it('keeps valid shared DR-HAP009S definitions available', () => {
@@ -94,6 +110,16 @@ describe('DR-HAP009S generic Friendly-State separation', () => {
 				stateId: 'level',
 				rawKey: 'rgblevel',
 			},
+			{
+				channelId: 'airPurifierDisplay',
+				stateId: 'on',
+				rawKey: 'ledalwayson',
+			},
+			{
+				channelId: 'airPurifierSettings',
+				stateId: 'powerRecovery',
+				rawKey: 'autoon',
+			},
 		]) {
 			expect(isConflictingGenericAirPurifierFriendlyState('DR-HAP009S', definition)).to.equal(false);
 		}
@@ -122,6 +148,14 @@ describe('DR-HAP009S generic Friendly-State separation', () => {
 					channelId: 'moodLight',
 					stateId: 'on',
 					rawKey: 'rgblevel',
+				}),
+			).to.equal(false);
+
+			expect(
+				isConflictingGenericAirPurifierFriendlyState(model, {
+					channelId: 'display',
+					stateId: 'on',
+					rawKey: 'ledlevel',
 				}),
 			).to.equal(false);
 		}
@@ -389,5 +423,102 @@ describe('DR-HAP009S mood light', () => {
 		]);
 		expect(switchCalls).to.deep.equal([]);
 		expect(levelCalls).to.deep.equal([]);
+	});
+});
+
+describe('DR-HAP009S display and power recovery', () => {
+	it('normalizes writable display values only for DR-HAP009S', () => {
+		expect(normalizeWritableAirPurifierDisplay(true, 'DR-HAP009S')).to.equal(true);
+		expect(normalizeWritableAirPurifierDisplay(0, 'DR-HAP009S')).to.equal(false);
+		expect(normalizeWritableAirPurifierDisplay(' true ', 'DR-HAP009S')).to.equal(true);
+
+		expect(normalizeWritableAirPurifierDisplay(2, 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierDisplay('yes', 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierDisplay(true, 'DR-HPF002S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierDisplay(true, undefined)).to.equal(undefined);
+	});
+
+	it('normalizes writable power-recovery values only for DR-HAP009S', () => {
+		expect(normalizeWritableAirPurifierPowerRecovery(true, 'DR-HAP009S')).to.equal(true);
+		expect(normalizeWritableAirPurifierPowerRecovery(0, 'DR-HAP009S')).to.equal(false);
+		expect(normalizeWritableAirPurifierPowerRecovery(' false ', 'DR-HAP009S')).to.equal(false);
+
+		expect(normalizeWritableAirPurifierPowerRecovery(2, 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierPowerRecovery('yes', 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierPowerRecovery(true, 'DR-HHM001S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierPowerRecovery(true, undefined)).to.equal(undefined);
+	});
+
+	it('forwards display writes only to setAirPurifierDisplay', async () => {
+		const calls: boolean[] = [];
+		const device: WritableAirPurifierDisplayDevice = {
+			model: 'DR-HAP009S',
+			setAirPurifierDisplay: enabled => {
+				calls.push(enabled);
+				return Promise.resolve();
+			},
+		};
+
+		expect(await writeAirPurifierDisplayState(device, 'true')).to.equal(true);
+		expect(await writeAirPurifierDisplayState(device, false)).to.equal(false);
+		expect(calls).to.deep.equal([true, false]);
+	});
+
+	it('forwards power recovery only to setAirPurifierPowerRecovery', async () => {
+		const calls: boolean[] = [];
+		const device: WritableAirPurifierPowerRecoveryDevice = {
+			model: 'DR-HAP009S',
+			setAirPurifierPowerRecovery: enabled => {
+				calls.push(enabled);
+				return Promise.resolve();
+			},
+		};
+
+		expect(await writeAirPurifierPowerRecoveryState(device, 'false')).to.equal(false);
+		expect(await writeAirPurifierPowerRecoveryState(device, true)).to.equal(true);
+		expect(calls).to.deep.equal([false, true]);
+	});
+
+	it('rejects invalid values without calling either SDK method', async () => {
+		const displayCalls: boolean[] = [];
+		const recoveryCalls: boolean[] = [];
+
+		const displayDevice: WritableAirPurifierDisplayDevice = {
+			model: 'DR-HAP009S',
+			setAirPurifierDisplay: enabled => {
+				displayCalls.push(enabled);
+				return Promise.resolve();
+			},
+		};
+
+		const recoveryDevice: WritableAirPurifierPowerRecoveryDevice = {
+			model: 'DR-HAP009S',
+			setAirPurifierPowerRecovery: enabled => {
+				recoveryCalls.push(enabled);
+				return Promise.resolve();
+			},
+		};
+
+		const errors: Error[] = [];
+
+		for (const operation of [
+			() => writeAirPurifierDisplayState(displayDevice, 'yes'),
+			() => writeAirPurifierPowerRecoveryState(recoveryDevice, 2),
+		]) {
+			try {
+				await operation();
+			} catch (error) {
+				if (error instanceof Error) {
+					errors.push(error);
+				}
+			}
+		}
+
+		expect(errors.map(error => error.message)).to.deep.equal([
+			'Invalid air purifier display state for DR-HAP009S: yes',
+			'Invalid air purifier power-recovery state for DR-HAP009S: 2',
+		]);
+		expect(displayCalls).to.deep.equal([]);
+		expect(recoveryCalls).to.deep.equal([]);
 	});
 });

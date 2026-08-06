@@ -306,6 +306,110 @@ export async function writeAirPurifierMoodLightLevelState(
 }
 
 /**
+ * SDK surface required by the writable air-purifier display state.
+ */
+export interface WritableAirPurifierDisplayDevice {
+	/** Reported DREO model identifier. */
+	readonly model: string;
+
+	/**
+	 * Switches the native DR-HAP009S display.
+	 *
+	 * @param enabled Whether the display should be enabled.
+	 */
+	setAirPurifierDisplay(enabled: boolean): Promise<void>;
+}
+
+/**
+ * SDK surface required by the writable power-recovery state.
+ */
+export interface WritableAirPurifierPowerRecoveryDevice {
+	/** Reported DREO model identifier. */
+	readonly model: string;
+
+	/**
+	 * Configures native DR-HAP009S power recovery.
+	 *
+	 * @param enabled Whether the purifier should resume after power returns.
+	 */
+	setAirPurifierPowerRecovery(enabled: boolean): Promise<void>;
+}
+
+/**
+ * Normalizes a writable DR-HAP009S display value.
+ *
+ * @param value Requested ioBroker state value.
+ * @param model Reported DREO model identifier.
+ * @returns The normalized boolean, or undefined.
+ */
+export function normalizeWritableAirPurifierDisplay(value: unknown, model: unknown): boolean | undefined {
+	if (!isAirPurifierModel(model)) {
+		return undefined;
+	}
+
+	return normalizeWritableBoolean(value);
+}
+
+/**
+ * Normalizes a writable DR-HAP009S power-recovery value.
+ *
+ * @param value Requested ioBroker state value.
+ * @param model Reported DREO model identifier.
+ * @returns The normalized boolean, or undefined.
+ */
+export function normalizeWritableAirPurifierPowerRecovery(value: unknown, model: unknown): boolean | undefined {
+	if (!isAirPurifierModel(model)) {
+		return undefined;
+	}
+
+	return normalizeWritableBoolean(value);
+}
+
+/**
+ * Normalizes and forwards a display write to the public SDK.
+ *
+ * @param device Writable DREO air purifier.
+ * @param value Requested ioBroker state value.
+ * @returns The boolean value forwarded to the SDK.
+ */
+export async function writeAirPurifierDisplayState(
+	device: WritableAirPurifierDisplayDevice,
+	value: unknown,
+): Promise<boolean> {
+	const enabled = normalizeWritableAirPurifierDisplay(value, device.model);
+
+	if (enabled === undefined) {
+		throw new Error(`Invalid air purifier display state for ${device.model}: ${String(value)}`);
+	}
+
+	await device.setAirPurifierDisplay(enabled);
+
+	return enabled;
+}
+
+/**
+ * Normalizes and forwards a power-recovery write to the public SDK.
+ *
+ * @param device Writable DREO air purifier.
+ * @param value Requested ioBroker state value.
+ * @returns The boolean value forwarded to the SDK.
+ */
+export async function writeAirPurifierPowerRecoveryState(
+	device: WritableAirPurifierPowerRecoveryDevice,
+	value: unknown,
+): Promise<boolean> {
+	const enabled = normalizeWritableAirPurifierPowerRecovery(value, device.model);
+
+	if (enabled === undefined) {
+		throw new Error(`Invalid air purifier power-recovery state for ${device.model}: ${String(value)}`);
+	}
+
+	await device.setAirPurifierPowerRecovery(enabled);
+
+	return enabled;
+}
+
+/**
  * Detects generic Friendly-State definitions that must not be exposed for the
  * DR-HAP009S because their meaning or value type differs from the confirmed
  * air-purifier semantics.
@@ -328,6 +432,9 @@ export function isConflictingGenericAirPurifierFriendlyState(
 	return (
 		(definition.channelId === 'fan' && definition.stateId === 'speed' && definition.rawKey === 'windlevel') ||
 		(definition.channelId === 'fan' && definition.stateId === 'mode' && definition.rawKey === 'mode') ||
-		(definition.channelId === 'moodLight' && definition.stateId === 'on' && definition.rawKey === 'rgblevel')
+		(definition.channelId === 'moodLight' && definition.stateId === 'on' && definition.rawKey === 'rgblevel') ||
+		(definition.channelId === 'display' &&
+			definition.stateId === 'on' &&
+			['lighton', 'ledlevel'].includes(definition.rawKey))
 	);
 }
