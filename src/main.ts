@@ -47,6 +47,7 @@ import {
 	selectFriendlyWriteAcknowledgementValue,
 	selectDisplayRawKey,
 } from './lib/friendly-state';
+import { isFilterLifeRemainingModel, normalizeFilterLifeRemaining } from './lib/filter-life';
 import { formatDiscoveredRawKeysMessage } from './lib/raw-state';
 import { isWritableSettingsStateId, writeSettingsBooleanState } from './lib/settings-write';
 
@@ -1093,11 +1094,13 @@ class DreoCloud extends utils.Adapter {
 			}
 
 			if (
-				(definition.rawKey === 'filteron' ||
-					definition.rawKey === 'filtertime' ||
-					definition.rawKey === 'worktime') &&
+				(definition.rawKey === 'filteron' || definition.rawKey === 'worktime') &&
 				resolvedDevice.device.model !== 'DR-HHM001S'
 			) {
+				return false;
+			}
+
+			if (definition.rawKey === 'filtertime' && !isFilterLifeRemainingModel(resolvedDevice.device.model)) {
 				return false;
 			}
 
@@ -1152,6 +1155,12 @@ class DreoCloud extends utils.Adapter {
 			const scene = this.client?.getDevice(resolvedDevice.device.sn)?.state.scene;
 
 			return normalizeSleepLightSceneValue(scene, definition.stateId);
+		}
+
+		if (definition.channelId === 'info' && definition.stateId === 'filterLifeRemaining') {
+			const semanticFilterLife = this.client?.getDevice(resolvedDevice.device.sn)?.state.filterLifeRemaining;
+
+			return normalizeFilterLifeRemaining(semanticFilterLife ?? value);
 		}
 
 		if (definition.channelId === 'airPurifier' && definition.stateId === 'mode') {
