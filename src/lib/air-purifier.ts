@@ -104,6 +104,92 @@ export async function writeAirPurifierModeState(
 }
 
 /**
+ * SDK surface required by the writable air-purifier fan-level Friendly State.
+ */
+export interface WritableAirPurifierWindLevelDevice {
+	/** Reported DREO model identifier. */
+	readonly model: string;
+
+	/**
+	 * Sets the native DR-HAP009S fan level.
+	 *
+	 * @param level Confirmed integer fan level from 1 through 3.
+	 */
+	setAirPurifierWindLevel(level: number): Promise<void>;
+}
+
+/**
+ * Validates a semantic DR-HAP009S fan-level value.
+ *
+ * Read values must already be exact integers in the confirmed range 1–3.
+ *
+ * @param value Semantic SDK state value.
+ * @returns A confirmed fan level, or undefined.
+ */
+export function normalizeAirPurifierWindLevel(value: unknown): number | undefined {
+	if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 3) {
+		return undefined;
+	}
+
+	return value;
+}
+
+/**
+ * Normalizes an ioBroker write into a confirmed DR-HAP009S fan level.
+ *
+ * Numeric strings are accepted for ioBroker compatibility. Unsupported
+ * models, fractions and values outside 1–3 are rejected.
+ *
+ * @param value Requested ioBroker state value.
+ * @param model Reported DREO model identifier.
+ * @returns A confirmed fan level, or undefined.
+ */
+export function normalizeWritableAirPurifierWindLevel(value: unknown, model: unknown): number | undefined {
+	if (!isAirPurifierModel(model)) {
+		return undefined;
+	}
+
+	let normalizedValue = value;
+
+	if (typeof value === 'string') {
+		const trimmedValue = value.trim();
+
+		if (trimmedValue.length === 0) {
+			return undefined;
+		}
+
+		normalizedValue = Number(trimmedValue);
+	}
+
+	return normalizeAirPurifierWindLevel(normalizedValue);
+}
+
+/**
+ * Normalizes and forwards an air-purifier fan-level write to the public SDK.
+ *
+ * Mode checks and native command semantics remain inside the SDK. The adapter
+ * neither switches modes nor adds power or fan states.
+ *
+ * @param device Writable DREO air purifier.
+ * @param value Requested ioBroker state value.
+ * @returns The confirmed fan level forwarded to the SDK.
+ */
+export async function writeAirPurifierWindLevelState(
+	device: WritableAirPurifierWindLevelDevice,
+	value: unknown,
+): Promise<number> {
+	const level = normalizeWritableAirPurifierWindLevel(value, device.model);
+
+	if (level === undefined) {
+		throw new Error(`Invalid air purifier fan level for ${device.model}: ${String(value)}`);
+	}
+
+	await device.setAirPurifierWindLevel(level);
+
+	return level;
+}
+
+/**
  * Detects generic Friendly-State definitions that must not be exposed for the
  * DR-HAP009S because their meaning or value type differs from the confirmed
  * air-purifier semantics.

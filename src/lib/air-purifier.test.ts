@@ -5,9 +5,13 @@ import {
 	isAirPurifierModel,
 	isConflictingGenericAirPurifierFriendlyState,
 	normalizeAirPurifierMode,
+	normalizeAirPurifierWindLevel,
 	normalizeWritableAirPurifierMode,
+	normalizeWritableAirPurifierWindLevel,
 	type WritableAirPurifierModeDevice,
+	type WritableAirPurifierWindLevelDevice,
 	writeAirPurifierModeState,
+	writeAirPurifierWindLevelState,
 } from './air-purifier';
 
 describe('DR-HAP009S generic Friendly-State separation', () => {
@@ -188,6 +192,76 @@ describe('DR-HAP009S operating mode', () => {
 
 		expect(caughtError).to.be.instanceOf(Error);
 		expect((caughtError as Error).message).to.equal('Invalid air purifier mode for DR-HAP009S: auto');
+		expect(calls).to.deep.equal([]);
+	});
+});
+
+describe('DR-HAP009S fan level', () => {
+	it('accepts only exact semantic integer levels from 1 through 3', () => {
+		for (const level of [1, 2, 3]) {
+			expect(normalizeAirPurifierWindLevel(level)).to.equal(level);
+		}
+
+		expect(normalizeAirPurifierWindLevel(0)).to.equal(undefined);
+		expect(normalizeAirPurifierWindLevel(4)).to.equal(undefined);
+		expect(normalizeAirPurifierWindLevel(1.5)).to.equal(undefined);
+		expect(normalizeAirPurifierWindLevel(Number.NaN)).to.equal(undefined);
+		expect(normalizeAirPurifierWindLevel('2')).to.equal(undefined);
+		expect(normalizeAirPurifierWindLevel(null)).to.equal(undefined);
+	});
+
+	it('normalizes confirmed numeric writes only for DR-HAP009S', () => {
+		expect(normalizeWritableAirPurifierWindLevel(1, 'DR-HAP009S')).to.equal(1);
+		expect(normalizeWritableAirPurifierWindLevel(' 2 ', 'DR-HAP009S')).to.equal(2);
+		expect(normalizeWritableAirPurifierWindLevel('3', 'DR-HAP009S')).to.equal(3);
+
+		expect(normalizeWritableAirPurifierWindLevel(0, 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierWindLevel(4, 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierWindLevel(1.5, 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierWindLevel('2.5', 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierWindLevel('', 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierWindLevel('manual', 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierWindLevel(2, 'DR-HPF002S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierWindLevel(2, undefined)).to.equal(undefined);
+	});
+
+	it('forwards only the normalized level to setAirPurifierWindLevel', async () => {
+		const calls: number[] = [];
+		const device: WritableAirPurifierWindLevelDevice = {
+			model: 'DR-HAP009S',
+			setAirPurifierWindLevel: level => {
+				calls.push(level);
+
+				return Promise.resolve();
+			},
+		};
+
+		expect(await writeAirPurifierWindLevelState(device, ' 2 ')).to.equal(2);
+		expect(await writeAirPurifierWindLevelState(device, 3)).to.equal(3);
+		expect(await writeAirPurifierWindLevelState(device, 3)).to.equal(3);
+		expect(calls).to.deep.equal([2, 3, 3]);
+	});
+
+	it('rejects invalid levels without calling the SDK', async () => {
+		const calls: number[] = [];
+		const device: WritableAirPurifierWindLevelDevice = {
+			model: 'DR-HAP009S',
+			setAirPurifierWindLevel: level => {
+				calls.push(level);
+
+				return Promise.resolve();
+			},
+		};
+		let caughtError: unknown;
+
+		try {
+			await writeAirPurifierWindLevelState(device, 4);
+		} catch (error) {
+			caughtError = error;
+		}
+
+		expect(caughtError).to.be.instanceOf(Error);
+		expect((caughtError as Error).message).to.equal('Invalid air purifier fan level for DR-HAP009S: 4');
 		expect(calls).to.deep.equal([]);
 	});
 });

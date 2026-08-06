@@ -17,7 +17,9 @@ import {
 	isAirPurifierModel,
 	isConflictingGenericAirPurifierFriendlyState,
 	normalizeAirPurifierMode,
+	normalizeAirPurifierWindLevel,
 	writeAirPurifierModeState,
+	writeAirPurifierWindLevelState,
 } from './lib/air-purifier';
 import { validateConfig } from './lib/config';
 import { getConfirmedFanModeMetadata, isWritableFanModeModel, writeFanModeState } from './lib/fan-mode';
@@ -107,6 +109,19 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		type: 'string',
 		role: 'value',
 		states: { ...AIR_PURIFIER_MODE_STATES },
+	},
+	{
+		channelId: 'airPurifier',
+		path: ['airPurifier', 'fanLevel'],
+		channelNames: ['Air purifier'],
+		stateId: 'fanLevel',
+		stateName: 'Fan level',
+		rawKey: 'windlevel',
+		type: 'number',
+		role: 'level',
+		min: 1,
+		max: 3,
+		step: 1,
 	},
 	{
 		channelId: 'humidifier',
@@ -1059,6 +1074,12 @@ class DreoCloud extends utils.Adapter {
 			return normalizeAirPurifierMode(semanticMode ?? value);
 		}
 
+		if (definition.channelId === 'airPurifier' && definition.stateId === 'fanLevel') {
+			const semanticLevel = this.client?.getDevice(resolvedDevice.device.sn)?.state.windLevel;
+
+			return normalizeAirPurifierWindLevel(semanticLevel ?? value);
+		}
+
 		if (definition.channelId === 'fan' && definition.stateId === 'oscillationMode') {
 			const mode = this.client?.getDevice(resolvedDevice.device.sn)?.state.directionalOscillationMode;
 
@@ -1133,6 +1154,7 @@ class DreoCloud extends utils.Adapter {
 			'fan.speed',
 			'fan.mode',
 			'airPurifier.mode',
+			'airPurifier.fanLevel',
 			'humidifier.mode',
 			'humidifier.fogLevel',
 			'humidifier.autoTargetHumidity',
@@ -1656,6 +1678,10 @@ class DreoCloud extends utils.Adapter {
 
 		if (channelId === 'airPurifier' && stateId === 'mode') {
 			return writeAirPurifierModeState(device, value);
+		}
+
+		if (channelId === 'airPurifier' && stateId === 'fanLevel') {
+			return writeAirPurifierWindLevelState(device, value);
 		}
 
 		if (channelId === 'humidifier') {
