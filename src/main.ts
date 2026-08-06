@@ -16,9 +16,13 @@ import {
 	AIR_PURIFIER_MODE_STATES,
 	isAirPurifierModel,
 	isConflictingGenericAirPurifierFriendlyState,
+	normalizeAirPurifierBoolean,
 	normalizeAirPurifierMode,
+	normalizeAirPurifierMoodLightLevel,
 	normalizeAirPurifierWindLevel,
 	writeAirPurifierModeState,
+	writeAirPurifierMoodLightLevelState,
+	writeAirPurifierMoodLightState,
 	writeAirPurifierWindLevelState,
 } from './lib/air-purifier';
 import { validateConfig } from './lib/config';
@@ -117,6 +121,29 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		stateId: 'fanLevel',
 		stateName: 'Fan level',
 		rawKey: 'windlevel',
+		type: 'number',
+		role: 'level',
+		min: 1,
+		max: 3,
+		step: 1,
+	},
+	{
+		channelId: 'airPurifierMoodLight',
+		path: ['light', 'mood', 'on'],
+		channelNames: ['Light', 'Mood light'],
+		stateId: 'on',
+		stateName: 'Mood light',
+		rawKey: 'rgbalwayson',
+		type: 'boolean',
+		role: 'switch.light',
+	},
+	{
+		channelId: 'airPurifierMoodLight',
+		path: ['light', 'mood', 'level'],
+		channelNames: ['Light', 'Mood light'],
+		stateId: 'level',
+		stateName: 'Mood-light level',
+		rawKey: 'rgblevel',
 		type: 'number',
 		role: 'level',
 		min: 1,
@@ -994,7 +1021,10 @@ class DreoCloud extends utils.Adapter {
 				return false;
 			}
 
-			if (definition.channelId === 'airPurifier' && !isAirPurifierModel(resolvedDevice.device.model)) {
+			if (
+				['airPurifier', 'airPurifierMoodLight'].includes(definition.channelId) &&
+				!isAirPurifierModel(resolvedDevice.device.model)
+			) {
 				return false;
 			}
 
@@ -1080,6 +1110,18 @@ class DreoCloud extends utils.Adapter {
 			return normalizeAirPurifierWindLevel(semanticLevel ?? value);
 		}
 
+		if (definition.channelId === 'airPurifierMoodLight') {
+			const deviceState = this.client?.getDevice(resolvedDevice.device.sn)?.state;
+
+			if (definition.stateId === 'on') {
+				return normalizeAirPurifierBoolean(deviceState?.airPurifierMoodLight ?? value);
+			}
+
+			if (definition.stateId === 'level') {
+				return normalizeAirPurifierMoodLightLevel(deviceState?.airPurifierMoodLightLevel ?? value);
+			}
+		}
+
 		if (definition.channelId === 'fan' && definition.stateId === 'oscillationMode') {
 			const mode = this.client?.getDevice(resolvedDevice.device.sn)?.state.directionalOscillationMode;
 
@@ -1133,7 +1175,7 @@ class DreoCloud extends utils.Adapter {
 	}
 
 	private isAirPurifierFriendlyState(definition: FriendlyStateDefinition): boolean {
-		return definition.channelId === 'airPurifier';
+		return ['airPurifier', 'airPurifierMoodLight'].includes(definition.channelId);
 	}
 
 	private isHumidifierFriendlyState(definition: FriendlyStateDefinition): boolean {
@@ -1155,6 +1197,8 @@ class DreoCloud extends utils.Adapter {
 			'fan.mode',
 			'airPurifier.mode',
 			'airPurifier.fanLevel',
+			'airPurifierMoodLight.on',
+			'airPurifierMoodLight.level',
 			'humidifier.mode',
 			'humidifier.fogLevel',
 			'humidifier.autoTargetHumidity',
@@ -1646,6 +1690,9 @@ class DreoCloud extends utils.Adapter {
 					await device.setMoodLight(booleanValue);
 					return booleanValue;
 
+				case 'airPurifierMoodLight':
+					return writeAirPurifierMoodLightState(device, booleanValue);
+
 				case 'rgb':
 					await device.setAtmosphereLight(booleanValue);
 					return booleanValue;
@@ -1682,6 +1729,10 @@ class DreoCloud extends utils.Adapter {
 
 		if (channelId === 'airPurifier' && stateId === 'fanLevel') {
 			return writeAirPurifierWindLevelState(device, value);
+		}
+
+		if (channelId === 'airPurifierMoodLight' && stateId === 'level') {
+			return writeAirPurifierMoodLightLevelState(device, value);
 		}
 
 		if (channelId === 'humidifier') {

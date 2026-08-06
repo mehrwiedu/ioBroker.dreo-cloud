@@ -4,13 +4,20 @@ import {
 	AIR_PURIFIER_MODE_STATES,
 	isAirPurifierModel,
 	isConflictingGenericAirPurifierFriendlyState,
+	normalizeAirPurifierBoolean,
 	normalizeAirPurifierMode,
+	normalizeAirPurifierMoodLightLevel,
 	normalizeAirPurifierWindLevel,
 	normalizeWritableAirPurifierMode,
+	normalizeWritableAirPurifierMoodLight,
+	normalizeWritableAirPurifierMoodLightLevel,
 	normalizeWritableAirPurifierWindLevel,
 	type WritableAirPurifierModeDevice,
+	type WritableAirPurifierMoodLightDevice,
 	type WritableAirPurifierWindLevelDevice,
 	writeAirPurifierModeState,
+	writeAirPurifierMoodLightLevelState,
+	writeAirPurifierMoodLightState,
 	writeAirPurifierWindLevelState,
 } from './air-purifier';
 
@@ -263,5 +270,124 @@ describe('DR-HAP009S fan level', () => {
 		expect(caughtError).to.be.instanceOf(Error);
 		expect((caughtError as Error).message).to.equal('Invalid air purifier fan level for DR-HAP009S: 4');
 		expect(calls).to.deep.equal([]);
+	});
+});
+
+describe('DR-HAP009S mood light', () => {
+	it('accepts only exact semantic boolean switch values', () => {
+		expect(normalizeAirPurifierBoolean(true)).to.equal(true);
+		expect(normalizeAirPurifierBoolean(false)).to.equal(false);
+
+		expect(normalizeAirPurifierBoolean(1)).to.equal(undefined);
+		expect(normalizeAirPurifierBoolean(0)).to.equal(undefined);
+		expect(normalizeAirPurifierBoolean('true')).to.equal(undefined);
+		expect(normalizeAirPurifierBoolean(null)).to.equal(undefined);
+	});
+
+	it('normalizes writable switch values only for DR-HAP009S', () => {
+		expect(normalizeWritableAirPurifierMoodLight(true, 'DR-HAP009S')).to.equal(true);
+		expect(normalizeWritableAirPurifierMoodLight(false, 'DR-HAP009S')).to.equal(false);
+		expect(normalizeWritableAirPurifierMoodLight(1, 'DR-HAP009S')).to.equal(true);
+		expect(normalizeWritableAirPurifierMoodLight(0, 'DR-HAP009S')).to.equal(false);
+		expect(normalizeWritableAirPurifierMoodLight(' true ', 'DR-HAP009S')).to.equal(true);
+		expect(normalizeWritableAirPurifierMoodLight('false', 'DR-HAP009S')).to.equal(false);
+
+		expect(normalizeWritableAirPurifierMoodLight(2, 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierMoodLight('yes', 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierMoodLight(true, 'DR-HHM001S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierMoodLight(true, undefined)).to.equal(undefined);
+	});
+
+	it('accepts only mood-light levels from 1 through 3', () => {
+		for (const level of [1, 2, 3]) {
+			expect(normalizeAirPurifierMoodLightLevel(level)).to.equal(level);
+			expect(normalizeWritableAirPurifierMoodLightLevel(String(level), 'DR-HAP009S')).to.equal(level);
+		}
+
+		expect(normalizeAirPurifierMoodLightLevel(0)).to.equal(undefined);
+		expect(normalizeAirPurifierMoodLightLevel(4)).to.equal(undefined);
+		expect(normalizeAirPurifierMoodLightLevel('2')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierMoodLightLevel(1.5, 'DR-HAP009S')).to.equal(undefined);
+		expect(normalizeWritableAirPurifierMoodLightLevel(2, 'DR-HPF002S')).to.equal(undefined);
+	});
+
+	it('forwards switch writes only to setAirPurifierMoodLight', async () => {
+		const switchCalls: boolean[] = [];
+		const levelCalls: number[] = [];
+		const device: WritableAirPurifierMoodLightDevice = {
+			model: 'DR-HAP009S',
+			setAirPurifierMoodLight: enabled => {
+				switchCalls.push(enabled);
+				return Promise.resolve();
+			},
+			setAirPurifierMoodLightLevel: level => {
+				levelCalls.push(level);
+				return Promise.resolve();
+			},
+		};
+
+		expect(await writeAirPurifierMoodLightState(device, 'true')).to.equal(true);
+		expect(await writeAirPurifierMoodLightState(device, false)).to.equal(false);
+		expect(switchCalls).to.deep.equal([true, false]);
+		expect(levelCalls).to.deep.equal([]);
+	});
+
+	it('forwards level writes only to setAirPurifierMoodLightLevel', async () => {
+		const switchCalls: boolean[] = [];
+		const levelCalls: number[] = [];
+		const device: WritableAirPurifierMoodLightDevice = {
+			model: 'DR-HAP009S',
+			setAirPurifierMoodLight: enabled => {
+				switchCalls.push(enabled);
+				return Promise.resolve();
+			},
+			setAirPurifierMoodLightLevel: level => {
+				levelCalls.push(level);
+				return Promise.resolve();
+			},
+		};
+
+		expect(await writeAirPurifierMoodLightLevelState(device, '2')).to.equal(2);
+		expect(await writeAirPurifierMoodLightLevelState(device, 3)).to.equal(3);
+		expect(await writeAirPurifierMoodLightLevelState(device, 3)).to.equal(3);
+		expect(switchCalls).to.deep.equal([]);
+		expect(levelCalls).to.deep.equal([2, 3, 3]);
+	});
+
+	it('rejects invalid values without calling either SDK method', async () => {
+		const switchCalls: boolean[] = [];
+		const levelCalls: number[] = [];
+		const device: WritableAirPurifierMoodLightDevice = {
+			model: 'DR-HAP009S',
+			setAirPurifierMoodLight: enabled => {
+				switchCalls.push(enabled);
+				return Promise.resolve();
+			},
+			setAirPurifierMoodLightLevel: level => {
+				levelCalls.push(level);
+				return Promise.resolve();
+			},
+		};
+		const errors: Error[] = [];
+
+		for (const operation of [
+			() => writeAirPurifierMoodLightState(device, 'yes'),
+			() => writeAirPurifierMoodLightLevelState(device, 4),
+		]) {
+			try {
+				await operation();
+			} catch (error) {
+				if (error instanceof Error) {
+					errors.push(error);
+				}
+			}
+		}
+
+		expect(errors.map(error => error.message)).to.deep.equal([
+			'Invalid air purifier mood-light state for DR-HAP009S: yes',
+			'Invalid air purifier mood-light level for DR-HAP009S: 4',
+		]);
+		expect(switchCalls).to.deep.equal([]);
+		expect(levelCalls).to.deep.equal([]);
 	});
 });

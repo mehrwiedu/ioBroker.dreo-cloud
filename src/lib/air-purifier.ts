@@ -1,5 +1,7 @@
 import { isDreoAirPurifierMode, type DreoAirPurifierMode } from '@mehrwiedu/dreo-api';
 
+import { normalizeWritableBoolean } from './friendly-state';
+
 /**
  * Minimal identity required to distinguish Friendly-State definitions whose
  * generic semantics conflict with the confirmed DR-HAP009S semantics.
@@ -185,6 +187,120 @@ export async function writeAirPurifierWindLevelState(
 	}
 
 	await device.setAirPurifierWindLevel(level);
+
+	return level;
+}
+
+/**
+ * SDK surface required by the writable air-purifier mood-light states.
+ */
+export interface WritableAirPurifierMoodLightDevice {
+	/** Reported DREO model identifier. */
+	readonly model: string;
+
+	/**
+	 * Switches the native DR-HAP009S mood light.
+	 *
+	 * @param enabled Whether the mood light should be enabled.
+	 */
+	setAirPurifierMoodLight(enabled: boolean): Promise<void>;
+
+	/**
+	 * Sets the native DR-HAP009S mood-light level.
+	 *
+	 * @param level Confirmed integer level from 1 through 3.
+	 */
+	setAirPurifierMoodLightLevel(level: number): Promise<void>;
+}
+
+/**
+ * Validates an exact semantic air-purifier boolean state.
+ *
+ * @param value Semantic SDK state value.
+ * @returns The boolean value, or undefined.
+ */
+export function normalizeAirPurifierBoolean(value: unknown): boolean | undefined {
+	return typeof value === 'boolean' ? value : undefined;
+}
+
+/**
+ * Normalizes a writable air-purifier mood-light switch value.
+ *
+ * @param value Requested ioBroker state value.
+ * @param model Reported DREO model identifier.
+ * @returns The normalized boolean, or undefined.
+ */
+export function normalizeWritableAirPurifierMoodLight(value: unknown, model: unknown): boolean | undefined {
+	if (!isAirPurifierModel(model)) {
+		return undefined;
+	}
+
+	return normalizeWritableBoolean(value);
+}
+
+/**
+ * Validates an exact semantic DR-HAP009S mood-light level.
+ *
+ * @param value Semantic SDK state value.
+ * @returns An integer level from 1 through 3, or undefined.
+ */
+export function normalizeAirPurifierMoodLightLevel(value: unknown): number | undefined {
+	return normalizeAirPurifierWindLevel(value);
+}
+
+/**
+ * Normalizes a writable DR-HAP009S mood-light level.
+ *
+ * @param value Requested ioBroker state value.
+ * @param model Reported DREO model identifier.
+ * @returns An integer level from 1 through 3, or undefined.
+ */
+export function normalizeWritableAirPurifierMoodLightLevel(value: unknown, model: unknown): number | undefined {
+	return normalizeWritableAirPurifierWindLevel(value, model);
+}
+
+/**
+ * Normalizes and forwards a mood-light switch write to the public SDK.
+ *
+ * @param device Writable DREO air purifier.
+ * @param value Requested ioBroker state value.
+ * @returns The boolean value forwarded to the SDK.
+ */
+export async function writeAirPurifierMoodLightState(
+	device: WritableAirPurifierMoodLightDevice,
+	value: unknown,
+): Promise<boolean> {
+	const enabled = normalizeWritableAirPurifierMoodLight(value, device.model);
+
+	if (enabled === undefined) {
+		throw new Error(`Invalid air purifier mood-light state for ${device.model}: ${String(value)}`);
+	}
+
+	await device.setAirPurifierMoodLight(enabled);
+
+	return enabled;
+}
+
+/**
+ * Normalizes and forwards a mood-light level write to the public SDK.
+ *
+ * Native switch coupling remains entirely inside the SDK.
+ *
+ * @param device Writable DREO air purifier.
+ * @param value Requested ioBroker state value.
+ * @returns The level forwarded to the SDK.
+ */
+export async function writeAirPurifierMoodLightLevelState(
+	device: WritableAirPurifierMoodLightDevice,
+	value: unknown,
+): Promise<number> {
+	const level = normalizeWritableAirPurifierMoodLightLevel(value, device.model);
+
+	if (level === undefined) {
+		throw new Error(`Invalid air purifier mood-light level for ${device.model}: ${String(value)}`);
+	}
+
+	await device.setAirPurifierMoodLightLevel(level);
 
 	return level;
 }
