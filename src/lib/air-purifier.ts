@@ -1,4 +1,9 @@
-import { isDreoAirPurifierMode, type DreoAirPurifierMode } from '@mehrwiedu/dreo-api';
+import {
+	isDreoAirPurifierMode,
+	isDreoAirQualityLevel,
+	type DreoAirPurifierMode,
+	type DreoAirQualityLevel,
+} from '@mehrwiedu/dreo-api';
 
 import { normalizeWritableBoolean } from './friendly-state';
 
@@ -134,6 +139,33 @@ export function normalizeAirPurifierWindLevel(value: unknown): number | undefine
 	}
 
 	return value;
+}
+
+/**
+ * Validates an exact semantic DR-HAP009S PM2.5 reading.
+ *
+ * @param value Semantic SDK state value.
+ * @returns A non-negative integer PM2.5 value, or undefined.
+ */
+export function normalizeAirPurifierPm25(value: unknown): number | undefined {
+	if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
+		return undefined;
+	}
+
+	return value;
+}
+
+/**
+ * Validates an exact semantic DR-HAP009S air-quality level.
+ *
+ * Human-readable labels are intentionally not added because the complete
+ * category mapping has not yet been confirmed.
+ *
+ * @param value Semantic SDK state value.
+ * @returns A confirmed numeric air-quality level from 1 through 4, or undefined.
+ */
+export function normalizeAirPurifierAirQualityLevel(value: unknown): DreoAirQualityLevel | undefined {
+	return isDreoAirQualityLevel(value) ? value : undefined;
 }
 
 /**

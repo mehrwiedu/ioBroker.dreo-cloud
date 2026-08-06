@@ -4,9 +4,11 @@ import {
 	AIR_PURIFIER_MODE_STATES,
 	isAirPurifierModel,
 	isConflictingGenericAirPurifierFriendlyState,
+	normalizeAirPurifierAirQualityLevel,
 	normalizeAirPurifierBoolean,
 	normalizeAirPurifierMode,
 	normalizeAirPurifierMoodLightLevel,
+	normalizeAirPurifierPm25,
 	normalizeAirPurifierWindLevel,
 	normalizeWritableAirPurifierDisplay,
 	normalizeWritableAirPurifierMode,
@@ -119,6 +121,16 @@ describe('DR-HAP009S generic Friendly-State separation', () => {
 				channelId: 'airPurifierSettings',
 				stateId: 'powerRecovery',
 				rawKey: 'autoon',
+			},
+			{
+				channelId: 'airPurifierAirQuality',
+				stateId: 'pm25',
+				rawKey: 'pm25',
+			},
+			{
+				channelId: 'airPurifierAirQuality',
+				stateId: 'level',
+				rawKey: 'aq',
 			},
 		]) {
 			expect(isConflictingGenericAirPurifierFriendlyState('DR-HAP009S', definition)).to.equal(false);
@@ -520,5 +532,27 @@ describe('DR-HAP009S display and power recovery', () => {
 		]);
 		expect(displayCalls).to.deep.equal([]);
 		expect(recoveryCalls).to.deep.equal([]);
+	});
+});
+
+describe('DR-HAP009S air quality', () => {
+	it('accepts only non-negative integer PM2.5 readings', () => {
+		for (const value of [0, 1, 8, 17, 250]) {
+			expect(normalizeAirPurifierPm25(value)).to.equal(value);
+		}
+
+		for (const value of [-1, 1.5, '17', null, undefined, Number.NaN, Number.POSITIVE_INFINITY]) {
+			expect(normalizeAirPurifierPm25(value)).to.equal(undefined);
+		}
+	});
+
+	it('accepts only confirmed numeric air-quality levels from 1 through 4', () => {
+		for (const level of [1, 2, 3, 4]) {
+			expect(normalizeAirPurifierAirQualityLevel(level)).to.equal(level);
+		}
+
+		for (const value of [0, 5, 2.5, '4', null, undefined, Number.NaN, Number.POSITIVE_INFINITY]) {
+			expect(normalizeAirPurifierAirQualityLevel(value)).to.equal(undefined);
+		}
 	});
 });

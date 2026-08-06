@@ -16,9 +16,11 @@ import {
 	AIR_PURIFIER_MODE_STATES,
 	isAirPurifierModel,
 	isConflictingGenericAirPurifierFriendlyState,
+	normalizeAirPurifierAirQualityLevel,
 	normalizeAirPurifierBoolean,
 	normalizeAirPurifierMode,
 	normalizeAirPurifierMoodLightLevel,
+	normalizeAirPurifierPm25,
 	normalizeAirPurifierWindLevel,
 	writeAirPurifierDisplayState,
 	writeAirPurifierModeState,
@@ -127,6 +129,32 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		role: 'level',
 		min: 1,
 		max: 3,
+		step: 1,
+	},
+	{
+		channelId: 'airPurifierAirQuality',
+		path: ['airQuality', 'pm25'],
+		channelNames: ['Air quality'],
+		stateId: 'pm25',
+		stateName: 'PM2.5',
+		rawKey: 'pm25',
+		type: 'number',
+		role: 'value',
+		unit: 'µg/m³',
+		min: 0,
+		step: 1,
+	},
+	{
+		channelId: 'airPurifierAirQuality',
+		path: ['airQuality', 'level'],
+		channelNames: ['Air quality'],
+		stateId: 'level',
+		stateName: 'Air-quality level',
+		rawKey: 'aq',
+		type: 'number',
+		role: 'value',
+		min: 1,
+		max: 4,
 		step: 1,
 	},
 	{
@@ -1044,9 +1072,13 @@ class DreoCloud extends utils.Adapter {
 			}
 
 			if (
-				['airPurifier', 'airPurifierMoodLight', 'airPurifierDisplay', 'airPurifierSettings'].includes(
-					definition.channelId,
-				) &&
+				[
+					'airPurifier',
+					'airPurifierAirQuality',
+					'airPurifierMoodLight',
+					'airPurifierDisplay',
+					'airPurifierSettings',
+				].includes(definition.channelId) &&
 				!isAirPurifierModel(resolvedDevice.device.model)
 			) {
 				return false;
@@ -1134,6 +1166,18 @@ class DreoCloud extends utils.Adapter {
 			return normalizeAirPurifierWindLevel(semanticLevel ?? value);
 		}
 
+		if (definition.channelId === 'airPurifierAirQuality') {
+			const deviceState = this.client?.getDevice(resolvedDevice.device.sn)?.state;
+
+			if (definition.stateId === 'pm25') {
+				return normalizeAirPurifierPm25(deviceState?.airPurifierPm25 ?? value);
+			}
+
+			if (definition.stateId === 'level') {
+				return normalizeAirPurifierAirQualityLevel(deviceState?.airPurifierAirQualityLevel ?? value);
+			}
+		}
+
 		if (definition.channelId === 'airPurifierMoodLight') {
 			const deviceState = this.client?.getDevice(resolvedDevice.device.sn)?.state;
 
@@ -1212,9 +1256,13 @@ class DreoCloud extends utils.Adapter {
 	}
 
 	private isAirPurifierFriendlyState(definition: FriendlyStateDefinition): boolean {
-		return ['airPurifier', 'airPurifierMoodLight', 'airPurifierDisplay', 'airPurifierSettings'].includes(
-			definition.channelId,
-		);
+		return [
+			'airPurifier',
+			'airPurifierAirQuality',
+			'airPurifierMoodLight',
+			'airPurifierDisplay',
+			'airPurifierSettings',
+		].includes(definition.channelId);
 	}
 
 	private isHumidifierFriendlyState(definition: FriendlyStateDefinition): boolean {
