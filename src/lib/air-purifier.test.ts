@@ -2,6 +2,7 @@ import { expect } from 'chai';
 
 import {
 	AIR_PURIFIER_MODE_STATES,
+	getUnavailableLegacyAirPurifierFriendlyStatePaths,
 	isAirPurifierModel,
 	isConflictingGenericAirPurifierFriendlyState,
 	normalizeAirPurifierAirQualityLevel,
@@ -16,6 +17,7 @@ import {
 	normalizeWritableAirPurifierMoodLightLevel,
 	normalizeWritableAirPurifierPowerRecovery,
 	normalizeWritableAirPurifierWindLevel,
+	shouldRemoveLegacyAirPurifierFanChannel,
 	type WritableAirPurifierDisplayDevice,
 	type WritableAirPurifierModeDevice,
 	type WritableAirPurifierMoodLightDevice,
@@ -171,6 +173,42 @@ describe('DR-HAP009S generic Friendly-State separation', () => {
 				}),
 			).to.equal(false);
 		}
+	});
+});
+
+describe('DR-HAP009S legacy Friendly-State cleanup', () => {
+	it('selects only unavailable legacy generic fan states for the air purifier', () => {
+		expect(
+			getUnavailableLegacyAirPurifierFriendlyStatePaths(
+				'DR-HAP009S',
+				new Set(['airPurifier.mode', 'airPurifier.fanLevel', 'light.mood.on', 'display.on']),
+			),
+		).to.deep.equal(['fan.speed', 'fan.mode']);
+
+		expect(getUnavailableLegacyAirPurifierFriendlyStatePaths('DR-HAP009S', new Set(['fan.speed']))).to.deep.equal([
+			'fan.mode',
+		]);
+	});
+
+	it('does not migrate generic fan states on other models', () => {
+		for (const model of ['DR-HHM001S', 'DR-HPF002S', 'DR-HCF007S', undefined]) {
+			expect(getUnavailableLegacyAirPurifierFriendlyStatePaths(model, new Set<string>())).to.deep.equal([]);
+		}
+	});
+
+	it('removes the legacy fan channel only when no current fan states remain', () => {
+		expect(
+			shouldRemoveLegacyAirPurifierFanChannel(
+				'DR-HAP009S',
+				new Set(['airPurifier.mode', 'airPurifier.fanLevel']),
+			),
+		).to.equal(true);
+
+		expect(shouldRemoveLegacyAirPurifierFanChannel('DR-HAP009S', new Set(['fan.on', 'airPurifier.mode']))).to.equal(
+			false,
+		);
+
+		expect(shouldRemoveLegacyAirPurifierFanChannel('DR-HCF007S', new Set<string>())).to.equal(false);
 	});
 });
 

@@ -442,12 +442,50 @@ export async function writeAirPurifierPowerRecoveryState(
 }
 
 /**
- * Detects generic Friendly-State definitions that must not be exposed for the
- * DR-HAP009S because their meaning or value type differs from the confirmed
- * air-purifier semantics.
+ * Lists obsolete generic Friendly-State paths from earlier DR-HAP009S builds.
+ */
+export const LEGACY_AIR_PURIFIER_FRIENDLY_STATE_PATHS = ['fan.speed', 'fan.mode'] as const;
+
+/**
+ * Selects obsolete generic Friendly-State paths that may remain from an
+ * earlier DR-HAP009S adapter build.
  *
- * Dedicated air-purifier definitions using the same RAW keys remain possible
- * because the complete channel, state and RAW-key identity is checked.
+ * @param model Reported DREO model identifier.
+ * @param availablePaths Friendly-State paths available in the current build.
+ * @returns Legacy state paths that are no longer available.
+ */
+export function getUnavailableLegacyAirPurifierFriendlyStatePaths(
+	model: unknown,
+	availablePaths: ReadonlySet<string>,
+): string[] {
+	if (!isAirPurifierModel(model)) {
+		return [];
+	}
+
+	return LEGACY_AIR_PURIFIER_FRIENDLY_STATE_PATHS.filter(path => !availablePaths.has(path));
+}
+
+/**
+ * Determines whether the obsolete generic fan channel can be removed.
+ *
+ * The channel is retained whenever the current device still exposes another
+ * confirmed Friendly State below fan.*.
+ *
+ * @param model Reported DREO model identifier.
+ * @param availablePaths Friendly-State paths available in the current build.
+ * @returns Whether the legacy fan channel is no longer needed.
+ */
+export function shouldRemoveLegacyAirPurifierFanChannel(model: unknown, availablePaths: ReadonlySet<string>): boolean {
+	if (!isAirPurifierModel(model)) {
+		return false;
+	}
+
+	return !Array.from(availablePaths).some(path => path.startsWith('fan.'));
+}
+
+/**
+ * Checks whether a generic Friendly-State definition conflicts with confirmed
+ * DR-HAP009S semantics.
  *
  * @param model Reported DREO model identifier.
  * @param definition Friendly-State definition identity.

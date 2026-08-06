@@ -14,6 +14,7 @@ import {
 
 import {
 	AIR_PURIFIER_MODE_STATES,
+	getUnavailableLegacyAirPurifierFriendlyStatePaths,
 	isAirPurifierModel,
 	isConflictingGenericAirPurifierFriendlyState,
 	normalizeAirPurifierAirQualityLevel,
@@ -22,6 +23,7 @@ import {
 	normalizeAirPurifierMoodLightLevel,
 	normalizeAirPurifierPm25,
 	normalizeAirPurifierWindLevel,
+	shouldRemoveLegacyAirPurifierFanChannel,
 	writeAirPurifierDisplayState,
 	writeAirPurifierModeState,
 	writeAirPurifierMoodLightLevelState,
@@ -864,6 +866,7 @@ class DreoCloud extends utils.Adapter {
 		const createdChannelPaths = new Set<string>();
 
 		await this.migrateLegacyTimerStateObjects(deviceId, definitions);
+		await this.reconcileAirPurifierFriendlyObjects(deviceId, resolvedDevice, definitions);
 		await this.reconcileDirectionalOscillationFriendlyObjects(deviceId, definitions);
 
 		for (const definition of definitions) {
@@ -931,6 +934,48 @@ class DreoCloud extends utils.Adapter {
 			await this.delObjectAsync(objectId);
 
 			this.log.info(`Migrated legacy timer state ${objectId} to a channel.`);
+		}
+	}
+
+	private async reconcileAirPurifierFriendlyObjects(
+		deviceId: string,
+		resolvedDevice: ResolvedDevice,
+		definitions: readonly FriendlyStateDefinition[],
+	): Promise<void> {
+		const availablePaths = new Set(definitions.map(definition => definition.path.join('.')));
+		const unavailableLegacyPaths = getUnavailableLegacyAirPurifierFriendlyStatePaths(
+			resolvedDevice.device.model,
+			availablePaths,
+		);
+
+		for (const relativePath of unavailableLegacyPaths) {
+			const objectId = `devices.${deviceId}.${relativePath}`;
+			const existingObject = await this.getObjectAsync(objectId);
+
+			if (existingObject?.type !== 'state') {
+				continue;
+			}
+
+			const existingState = await this.getStateAsync(objectId);
+
+			if (existingState) {
+				await this.delStateAsync(objectId);
+			}
+
+			await this.delObjectAsync(objectId);
+			this.log.info(`Removed obsolete air-purifier Friendly State ${objectId}.`);
+		}
+
+		if (!shouldRemoveLegacyAirPurifierFanChannel(resolvedDevice.device.model, availablePaths)) {
+			return;
+		}
+
+		const channelId = `devices.${deviceId}.fan`;
+		const existingChannel = await this.getObjectAsync(channelId);
+
+		if (existingChannel?.type === 'channel') {
+			await this.delObjectAsync(channelId);
+			this.log.info(`Removed obsolete air-purifier channel ${channelId}.`);
 		}
 	}
 
