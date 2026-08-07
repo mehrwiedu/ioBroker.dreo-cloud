@@ -49,7 +49,7 @@ import {
 	selectFriendlyWriteAcknowledgementValue,
 	selectDisplayRawKey,
 } from './lib/friendly-state';
-import { isFilterLifeRemainingModel, normalizeFilterLifeRemaining } from './lib/filter-life';
+import { getFilterLifeRemainingRawKey, normalizeFilterLifeRemaining } from './lib/filter-life';
 import { formatDiscoveredRawKeysMessage } from './lib/raw-state';
 import { isWritableSettingsStateId, writeSettingsBooleanState } from './lib/settings-write';
 
@@ -1108,7 +1108,17 @@ class DreoCloud extends utils.Adapter {
 		const hasFan =
 			availableRawKeys.has('fanon') || availableRawKeys.has('windlevel') || availableRawKeys.has('oscmode');
 
-		return FRIENDLY_STATE_DEFINITIONS.filter(definition => {
+		const definitions = FRIENDLY_STATE_DEFINITIONS.flatMap(definition => {
+			if (definition.channelId !== 'info' || definition.stateId !== 'filterLifeRemaining') {
+				return [definition];
+			}
+
+			const rawKey = getFilterLifeRemainingRawKey(resolvedDevice.device.model);
+
+			return rawKey ? [{ ...definition, rawKey }] : [];
+		});
+
+		return definitions.filter(definition => {
 			if (!availableRawKeys.has(definition.rawKey)) {
 				return false;
 			}
@@ -1142,10 +1152,6 @@ class DreoCloud extends utils.Adapter {
 				(definition.rawKey === 'filteron' || definition.rawKey === 'worktime') &&
 				resolvedDevice.device.model !== 'DR-HHM001S'
 			) {
-				return false;
-			}
-
-			if (definition.rawKey === 'filtertime' && !isFilterLifeRemainingModel(resolvedDevice.device.model)) {
 				return false;
 			}
 

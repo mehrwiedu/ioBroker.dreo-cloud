@@ -1,8 +1,17 @@
 import { expect } from 'chai';
 
-import { isFilterLifeRemainingModel, normalizeFilterLifeRemaining } from './filter-life';
+import { getFilterLifeRemainingRawKey, isFilterLifeRemainingModel, normalizeFilterLifeRemaining } from './filter-life';
 
 describe('shared filter-life remaining', () => {
+	it('selects the confirmed native state for each supported model', () => {
+		expect(getFilterLifeRemainingRawKey('DR-HAP009S')).to.equal('lifetime');
+		expect(getFilterLifeRemainingRawKey('DR-HHM001S')).to.equal('filtertime');
+
+		for (const model of ['DR-HCF007S', 'DR-HPF002S', '', null, undefined]) {
+			expect(getFilterLifeRemainingRawKey(model)).to.equal(undefined);
+		}
+	});
+
 	it('accepts exactly the two confirmed models', () => {
 		expect(isFilterLifeRemainingModel('DR-HAP009S')).to.equal(true);
 		expect(isFilterLifeRemainingModel('DR-HHM001S')).to.equal(true);
