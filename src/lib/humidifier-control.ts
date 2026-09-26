@@ -33,6 +33,15 @@ export interface WritableHumidifierDevice {
 
 	/** Sets the upper humidity-indicator threshold from 20 through 85 percent. */
 	setHumidifierUpperHumidityThreshold(threshold: number): Promise<void>;
+
+	/** Switches the DR-HHM003S warm-mist heater. */
+	setHumidifierWarmMist(enabled: boolean): Promise<void>;
+
+	/** Sets the DR-HHM003S mood-light level from 0 through 2. */
+	setHumidifierMoodLightLevel(level: number): Promise<void>;
+
+	/** Sets the DR-HHM003S display level from 0 through 2. */
+	setHumidifierDisplayLevel(level: number): Promise<void>;
 }
 
 interface HumidifierValueRange {
@@ -75,6 +84,16 @@ const HUMIDIFIER_VALUE_RANGES: Readonly<Record<WritableHumidifierStateId, Humidi
  */
 export function isWritableHumidifierModel(model: unknown): boolean {
 	return model === 'DR-HHM001S' || model === 'DR-HHM003S';
+}
+
+/**
+ * Determines whether a model has confirmed DR-HHM003S-only controls.
+ *
+ * @param model Reported DREO model identifier.
+ * @returns Whether the model is the confirmed DR-HHM003S.
+ */
+export function isHhm003sHumidifierModel(model: unknown): boolean {
+	return model === 'DR-HHM003S';
 }
 
 /**
@@ -127,6 +146,117 @@ export function normalizeWritableHumidifierValue(value: unknown, stateId: string
 	) {
 		return undefined;
 	}
+
+	return normalizedValue;
+}
+
+/**
+ * Normalizes a DR-HHM003S indicator level.
+ *
+ * Confirmed values are 0 (off), 1 (low), and 2 (high).
+ *
+ * @param value Requested Friendly-State value.
+ * @param model Reported DREO model identifier.
+ * @returns A confirmed level, or undefined.
+ */
+export function normalizeWritableHhm003sHumidifierLevel(value: unknown, model: unknown): number | undefined {
+	if (!isHhm003sHumidifierModel(model)) {
+		return undefined;
+	}
+
+	let normalizedValue = value;
+
+	if (typeof value === 'string') {
+		const trimmedValue = value.trim();
+
+		if (trimmedValue.length === 0) {
+			return undefined;
+		}
+
+		normalizedValue = Number(trimmedValue);
+	}
+
+	if (
+		typeof normalizedValue !== 'number' ||
+		!Number.isFinite(normalizedValue) ||
+		!Number.isInteger(normalizedValue) ||
+		normalizedValue < 0 ||
+		normalizedValue > 2
+	) {
+		return undefined;
+	}
+
+	return normalizedValue;
+}
+
+/**
+ * Normalizes and forwards the DR-HHM003S warm-mist switch.
+ *
+ * @param device Writable DREO humidifier.
+ * @param value Requested ioBroker value.
+ * @returns The normalized boolean value.
+ */
+export async function writeHhm003sWarmMistState(device: WritableHumidifierDevice, value: unknown): Promise<boolean> {
+	if (!isHhm003sHumidifierModel(device.model)) {
+		throw new Error(`Warm mist is not supported for ${device.model}.`);
+	}
+
+	let normalizedValue: boolean | undefined;
+
+	if (typeof value === 'boolean') {
+		normalizedValue = value;
+	} else if (value === 1 || value === '1' || value === 'true') {
+		normalizedValue = true;
+	} else if (value === 0 || value === '0' || value === 'false') {
+		normalizedValue = false;
+	}
+
+	if (normalizedValue === undefined) {
+		throw new Error(`Invalid humidifier warmMist value for ${device.model}: ${String(value)}`);
+	}
+
+	await device.setHumidifierWarmMist(normalizedValue);
+
+	return normalizedValue;
+}
+
+/**
+ * Normalizes and forwards the DR-HHM003S mood-light level.
+ *
+ * @param device Writable DREO humidifier.
+ * @param value Requested ioBroker value.
+ * @returns The normalized level.
+ */
+export async function writeHhm003sMoodLightLevelState(
+	device: WritableHumidifierDevice,
+	value: unknown,
+): Promise<number> {
+	const normalizedValue = normalizeWritableHhm003sHumidifierLevel(value, device.model);
+
+	if (normalizedValue === undefined) {
+		throw new Error(`Invalid humidifier moodLight level for ${device.model}: ${String(value)}`);
+	}
+
+	await device.setHumidifierMoodLightLevel(normalizedValue);
+
+	return normalizedValue;
+}
+
+/**
+ * Normalizes and forwards the DR-HHM003S display level.
+ *
+ * @param device Writable DREO humidifier.
+ * @param value Requested ioBroker value.
+ * @returns The normalized level.
+ */
+export async function writeHhm003sDisplayLevelState(device: WritableHumidifierDevice, value: unknown): Promise<number> {
+	const normalizedValue = normalizeWritableHhm003sHumidifierLevel(value, device.model);
+
+	if (normalizedValue === undefined) {
+		throw new Error(`Invalid humidifier display level for ${device.model}: ${String(value)}`);
+	}
+
+	await device.setHumidifierDisplayLevel(normalizedValue);
 
 	return normalizedValue;
 }

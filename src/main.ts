@@ -33,7 +33,15 @@ import {
 } from './lib/air-purifier';
 import { validateConfig } from './lib/config';
 import { getConfirmedFanModeMetadata, isWritableFanModeModel, writeFanModeState } from './lib/fan-mode';
-import { isWritableHumidifierModel, writeHumidifierState } from './lib/humidifier-control';
+import {
+	isHhm003sHumidifierModel,
+	isWritableHumidifierModel,
+	normalizeWritableHhm003sHumidifierLevel,
+	writeHhm003sDisplayLevelState,
+	writeHhm003sMoodLightLevelState,
+	writeHhm003sWarmMistState,
+	writeHumidifierState,
+} from './lib/humidifier-control';
 import {
 	getConfiguredSleepLightDurationMinutes,
 	isDirectionalOscillationModel,
@@ -291,6 +299,16 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		step: 1,
 	},
 	{
+		channelId: 'humidifier',
+		path: ['humidifier', 'warmMist'],
+		channelNames: ['Humidifier'],
+		stateId: 'warmMist',
+		stateName: 'Warm mist',
+		rawKey: 'hotfogon',
+		type: 'boolean',
+		role: 'switch',
+	},
+	{
 		channelId: 'fan',
 		path: ['fan', 'oscillationMode'],
 		channelNames: ['Fan'],
@@ -439,6 +457,24 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		role: 'switch',
 	},
 	{
+		channelId: 'display',
+		path: ['display', 'level'],
+		channelNames: ['Display'],
+		stateId: 'level',
+		stateName: 'Display level',
+		rawKey: 'ledlevel',
+		type: 'number',
+		role: 'level',
+		min: 0,
+		max: 2,
+		step: 1,
+		states: {
+			0: 'Off',
+			1: 'Low',
+			2: 'High',
+		},
+	},
+	{
 		channelId: 'moodLight',
 		path: ['light', 'mood', 'on'],
 		channelNames: ['Light', 'Mood light'],
@@ -447,6 +483,24 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		rawKey: 'rgblevel',
 		type: 'boolean',
 		role: 'switch.light',
+	},
+	{
+		channelId: 'moodLight',
+		path: ['light', 'mood', 'level'],
+		channelNames: ['Light', 'Mood light'],
+		stateId: 'level',
+		stateName: 'Mood-light level',
+		rawKey: 'rgblevel',
+		type: 'number',
+		role: 'level',
+		min: 0,
+		max: 2,
+		step: 1,
+		states: {
+			0: 'Off',
+			1: 'Low',
+			2: 'High',
+		},
 	},
 	{
 		channelId: 'rgb',
@@ -1172,6 +1226,13 @@ class DreoCloud extends utils.Adapter {
 				return false;
 			}
 
+			if (
+				this.isHhm003sHumidifierFriendlyState(definition) &&
+				!isHhm003sHumidifierModel(resolvedDevice.device.model)
+			) {
+				return false;
+			}
+
 			if (definition.channelId === 'humidifier' && !isWritableHumidifierModel(resolvedDevice.device.model)) {
 				return false;
 			}
@@ -1198,10 +1259,18 @@ class DreoCloud extends utils.Adapter {
 			}
 
 			if (definition.channelId === 'display') {
+				if (definition.stateId === 'level') {
+					return isHhm003sHumidifierModel(resolvedDevice.device.model) && definition.rawKey === displayRawKey;
+				}
+
 				return definition.rawKey === displayRawKey;
 			}
 
 			if (definition.channelId === 'moodLight') {
+				if (definition.stateId === 'level') {
+					return isHhm003sHumidifierModel(resolvedDevice.device.model) && availableRawKeys.has('poweron');
+				}
+
 				return availableRawKeys.has('poweron');
 			}
 
@@ -1318,6 +1387,27 @@ class DreoCloud extends utils.Adapter {
 			);
 		}
 
+		if (definition.channelId === 'humidifier' && definition.stateId === 'warmMist') {
+			const semanticWarmMist = this.client?.getDevice(resolvedDevice.device.sn)?.state.humidifierWarmMist;
+
+			return typeof semanticWarmMist === 'boolean'
+				? semanticWarmMist
+				: typeof value === 'boolean'
+					? value
+					: undefined;
+		}
+
+		if (
+			(definition.channelId === 'display' || definition.channelId === 'moodLight') &&
+			definition.stateId === 'level'
+		) {
+			const deviceState = this.client?.getDevice(resolvedDevice.device.sn)?.state;
+			const semanticLevel =
+				definition.channelId === 'display' ? deviceState?.displayLevel : deviceState?.moodLightLevel;
+
+			return normalizeWritableHhm003sHumidifierLevel(semanticLevel ?? value, resolvedDevice.device.model);
+		}
+
 		if (definition.rawKey === 'rgblevel' || definition.rawKey === 'ledlevel') {
 			const powerValue = this.readRawStateValue(resolvedDevice, 'poweron');
 
@@ -1365,6 +1455,14 @@ class DreoCloud extends utils.Adapter {
 		return definition.channelId === 'humidifier';
 	}
 
+	private isHhm003sHumidifierFriendlyState(definition: FriendlyStateDefinition): boolean {
+		return (
+			(definition.channelId === 'humidifier' && definition.stateId === 'warmMist') ||
+			(definition.channelId === 'display' && definition.stateId === 'level') ||
+			(definition.channelId === 'moodLight' && definition.stateId === 'level')
+		);
+	}
+
 	private isDirectionalOscillationFriendlyState(definition: FriendlyStateDefinition): boolean {
 		return (
 			definition.channelId === 'fan' &&
@@ -1390,6 +1488,9 @@ class DreoCloud extends utils.Adapter {
 			'humidifier.sleepTargetHumidity',
 			'humidifier.humidityIndicatorLowerThreshold',
 			'humidifier.humidityIndicatorUpperThreshold',
+			'humidifier.warmMist',
+			'display.level',
+			'moodLight.level',
 			'fan.oscillationMode',
 			'fan.horizontalAngle',
 			'fan.verticalAngle',
@@ -1426,6 +1527,10 @@ class DreoCloud extends utils.Adapter {
 
 		if (this.isAirPurifierFriendlyState(definition)) {
 			return isAirPurifierModel(resolvedDevice.device.model);
+		}
+
+		if (this.isHhm003sHumidifierFriendlyState(definition)) {
+			return isHhm003sHumidifierModel(resolvedDevice.device.model);
 		}
 
 		if (this.isHumidifierFriendlyState(definition)) {
@@ -1927,6 +2032,18 @@ class DreoCloud extends utils.Adapter {
 
 		if (channelId === 'airPurifierSettings' && stateId === 'powerRecovery') {
 			return writeAirPurifierPowerRecoveryState(device, value);
+		}
+
+		if (channelId === 'humidifier' && stateId === 'warmMist') {
+			return writeHhm003sWarmMistState(device, value);
+		}
+
+		if (channelId === 'display' && stateId === 'level') {
+			return writeHhm003sDisplayLevelState(device, value);
+		}
+
+		if (channelId === 'moodLight' && stateId === 'level') {
+			return writeHhm003sMoodLightLevelState(device, value);
 		}
 
 		if (channelId === 'humidifier') {

@@ -1,10 +1,15 @@
 import { expect } from 'chai';
 
 import {
+	isHhm003sHumidifierModel,
 	isWritableHumidifierModel,
 	isWritableHumidifierStateId,
+	normalizeWritableHhm003sHumidifierLevel,
 	normalizeWritableHumidifierValue,
 	type WritableHumidifierDevice,
+	writeHhm003sDisplayLevelState,
+	writeHhm003sMoodLightLevelState,
+	writeHhm003sWarmMistState,
 	writeHumidifierState,
 } from './humidifier-control';
 
@@ -15,8 +20,11 @@ interface RecordedCall {
 		| 'setHumidifierAutoTargetHumidity'
 		| 'setHumidifierSleepTargetHumidity'
 		| 'setHumidifierLowerHumidityThreshold'
-		| 'setHumidifierUpperHumidityThreshold';
-	value: number;
+		| 'setHumidifierUpperHumidityThreshold'
+		| 'setHumidifierWarmMist'
+		| 'setHumidifierMoodLightLevel'
+		| 'setHumidifierDisplayLevel';
+	value: number | boolean;
 }
 
 function createRecordingDevice(model: string, calls: RecordedCall[]): WritableHumidifierDevice {
@@ -70,6 +78,30 @@ function createRecordingDevice(model: string, calls: RecordedCall[]): WritableHu
 
 			return Promise.resolve();
 		},
+		setHumidifierWarmMist: value => {
+			calls.push({
+				method: 'setHumidifierWarmMist',
+				value,
+			});
+
+			return Promise.resolve();
+		},
+		setHumidifierMoodLightLevel: value => {
+			calls.push({
+				method: 'setHumidifierMoodLightLevel',
+				value,
+			});
+
+			return Promise.resolve();
+		},
+		setHumidifierDisplayLevel: value => {
+			calls.push({
+				method: 'setHumidifierDisplayLevel',
+				value,
+			});
+
+			return Promise.resolve();
+		},
 	};
 }
 
@@ -80,6 +112,10 @@ describe('humidifier model and state guards', () => {
 		expect(isWritableHumidifierModel('DR-HPF002S')).to.equal(false);
 		expect(isWritableHumidifierModel('DR-HCF007S')).to.equal(false);
 		expect(isWritableHumidifierModel(undefined)).to.equal(false);
+
+		expect(isHhm003sHumidifierModel('DR-HHM003S')).to.equal(true);
+		expect(isHhm003sHumidifierModel('DR-HHM001S')).to.equal(false);
+		expect(isHhm003sHumidifierModel(undefined)).to.equal(false);
 	});
 
 	it('accepts exactly the six confirmed shared Friendly-State identifiers', () => {
@@ -161,6 +197,67 @@ describe('normalizeWritableHumidifierValue', () => {
 		expect(normalizeWritableHumidifierValue(null, 'mode', 'DR-HHM001S')).to.equal(undefined);
 		expect(normalizeWritableHumidifierValue(1, 'unknown', 'DR-HHM001S')).to.equal(undefined);
 		expect(normalizeWritableHumidifierValue(1, 'mode', 'DR-HPF002S')).to.equal(undefined);
+	});
+});
+
+describe('DR-HHM003S specific controls', () => {
+	it('accepts only confirmed 0 through 2 indicator levels', () => {
+		expect(normalizeWritableHhm003sHumidifierLevel(0, 'DR-HHM003S')).to.equal(0);
+		expect(normalizeWritableHhm003sHumidifierLevel('1', 'DR-HHM003S')).to.equal(1);
+		expect(normalizeWritableHhm003sHumidifierLevel(2, 'DR-HHM003S')).to.equal(2);
+
+		expect(normalizeWritableHhm003sHumidifierLevel(-1, 'DR-HHM003S')).to.equal(undefined);
+		expect(normalizeWritableHhm003sHumidifierLevel(3, 'DR-HHM003S')).to.equal(undefined);
+		expect(normalizeWritableHhm003sHumidifierLevel(1.5, 'DR-HHM003S')).to.equal(undefined);
+		expect(normalizeWritableHhm003sHumidifierLevel(1, 'DR-HHM001S')).to.equal(undefined);
+	});
+
+	it('forwards warm mist and both indicator levels only to their matching SDK methods', async () => {
+		const calls: RecordedCall[] = [];
+		const device = createRecordingDevice('DR-HHM003S', calls);
+
+		expect(await writeHhm003sWarmMistState(device, true)).to.equal(true);
+		expect(await writeHhm003sMoodLightLevelState(device, '1')).to.equal(1);
+		expect(await writeHhm003sDisplayLevelState(device, 2)).to.equal(2);
+
+		expect(calls).to.deep.equal([
+			{
+				method: 'setHumidifierWarmMist',
+				value: true,
+			},
+			{
+				method: 'setHumidifierMoodLightLevel',
+				value: 1,
+			},
+			{
+				method: 'setHumidifierDisplayLevel',
+				value: 2,
+			},
+		]);
+	});
+
+	it('rejects HHM003S-only writes for another humidifier model', async () => {
+		const calls: RecordedCall[] = [];
+		const device = createRecordingDevice('DR-HHM001S', calls);
+		const actions = [
+			() => writeHhm003sWarmMistState(device, true),
+			() => writeHhm003sMoodLightLevelState(device, 1),
+			() => writeHhm003sDisplayLevelState(device, 1),
+		];
+
+		for (const action of actions) {
+			let caughtError: unknown;
+
+			try {
+				await action();
+			} catch (error) {
+				caughtError = error;
+			}
+
+			expect(caughtError).to.be.instanceOf(Error);
+		}
+
+		expect(calls).to.deep.equal([]);
 	});
 });
 
