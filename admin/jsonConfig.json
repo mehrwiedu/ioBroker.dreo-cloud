@@ -6,7 +6,6 @@
 			"type": "text",
 			"label": "email",
 			"help": "email_help",
-			"required": true,
 			"newLine": true,
 			"xs": 12,
 			"sm": 12,
@@ -18,7 +17,6 @@
 			"type": "password",
 			"label": "password",
 			"help": "password_help",
-			"required": true,
 			"newLine": true,
 			"xs": 12,
 			"sm": 12,
@@ -30,7 +28,6 @@
 			"type": "select",
 			"label": "region",
 			"help": "region_help",
-			"required": true,
 			"newLine": true,
 			"default": "EU",
 			"options": [
