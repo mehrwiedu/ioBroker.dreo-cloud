@@ -3,7 +3,7 @@ export type FilterLifeRemainingRawKey = 'filtertime' | 'lifetime';
 /**
  * Selects the confirmed native filter-life state for a DREO model.
  *
- * The DR-HHM001S humidifier uses filtertime for its optional cartridge,
+ * The DR-HHM001S and DR-HHM003S humidifiers use filtertime for their optional cartridge,
  * while the DR-HAP009S air purifier reports required-filter life as lifetime.
  *
  * @param model Reported DREO model identifier.
@@ -14,7 +14,7 @@ export function getFilterLifeRemainingRawKey(model: unknown): FilterLifeRemainin
 		return 'lifetime';
 	}
 
-	if (model === 'DR-HHM001S') {
+	if (model === 'DR-HHM001S' || model === 'DR-HHM003S') {
 		return 'filtertime';
 	}
 

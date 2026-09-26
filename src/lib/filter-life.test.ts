@@ -6,15 +6,17 @@ describe('shared filter-life remaining', () => {
 	it('selects the confirmed native state for each supported model', () => {
 		expect(getFilterLifeRemainingRawKey('DR-HAP009S')).to.equal('lifetime');
 		expect(getFilterLifeRemainingRawKey('DR-HHM001S')).to.equal('filtertime');
+		expect(getFilterLifeRemainingRawKey('DR-HHM003S')).to.equal('filtertime');
 
 		for (const model of ['DR-HCF007S', 'DR-HPF002S', '', null, undefined]) {
 			expect(getFilterLifeRemainingRawKey(model)).to.equal(undefined);
 		}
 	});
 
-	it('accepts exactly the two confirmed models', () => {
+	it('accepts exactly the three confirmed models', () => {
 		expect(isFilterLifeRemainingModel('DR-HAP009S')).to.equal(true);
 		expect(isFilterLifeRemainingModel('DR-HHM001S')).to.equal(true);
+		expect(isFilterLifeRemainingModel('DR-HHM003S')).to.equal(true);
 
 		for (const model of ['DR-HCF007S', 'DR-HPF002S', '', null, undefined]) {
 			expect(isFilterLifeRemainingModel(model)).to.equal(false);

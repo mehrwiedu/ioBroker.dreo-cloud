@@ -263,6 +263,34 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		step: 1,
 	},
 	{
+		channelId: 'humidifier',
+		path: ['humidifier', 'humidityIndicatorLowerThreshold'],
+		channelNames: ['Humidifier'],
+		stateId: 'humidityIndicatorLowerThreshold',
+		stateName: 'Humidity indicator lower threshold',
+		rawKey: 'rgbth',
+		type: 'number',
+		role: 'level.humidity',
+		unit: '%',
+		min: 15,
+		max: 80,
+		step: 1,
+	},
+	{
+		channelId: 'humidifier',
+		path: ['humidifier', 'humidityIndicatorUpperThreshold'],
+		channelNames: ['Humidifier'],
+		stateId: 'humidityIndicatorUpperThreshold',
+		stateName: 'Humidity indicator upper threshold',
+		rawKey: 'rgbth',
+		type: 'number',
+		role: 'level.humidity',
+		unit: '%',
+		min: 20,
+		max: 85,
+		step: 1,
+	},
+	{
 		channelId: 'fan',
 		path: ['fan', 'oscillationMode'],
 		channelNames: ['Fan'],
@@ -1150,7 +1178,7 @@ class DreoCloud extends utils.Adapter {
 
 			if (
 				(definition.rawKey === 'filteron' || definition.rawKey === 'worktime') &&
-				resolvedDevice.device.model !== 'DR-HHM001S'
+				!isWritableHumidifierModel(resolvedDevice.device.model)
 			) {
 				return false;
 			}
@@ -1212,6 +1240,14 @@ class DreoCloud extends utils.Adapter {
 			const semanticFilterLife = this.client?.getDevice(resolvedDevice.device.sn)?.state.filterLifeRemaining;
 
 			return normalizeFilterLifeRemaining(semanticFilterLife ?? value);
+		}
+
+		if (definition.channelId === 'humidifier' && definition.stateId === 'humidityIndicatorLowerThreshold') {
+			return this.client?.getDevice(resolvedDevice.device.sn)?.state.humidityIndicatorLowerThreshold;
+		}
+
+		if (definition.channelId === 'humidifier' && definition.stateId === 'humidityIndicatorUpperThreshold') {
+			return this.client?.getDevice(resolvedDevice.device.sn)?.state.humidityIndicatorUpperThreshold;
 		}
 
 		if (definition.channelId === 'airPurifier' && definition.stateId === 'mode') {
@@ -1352,6 +1388,8 @@ class DreoCloud extends utils.Adapter {
 			'humidifier.fogLevel',
 			'humidifier.autoTargetHumidity',
 			'humidifier.sleepTargetHumidity',
+			'humidifier.humidityIndicatorLowerThreshold',
+			'humidifier.humidityIndicatorUpperThreshold',
 			'fan.oscillationMode',
 			'fan.horizontalAngle',
 			'fan.verticalAngle',
@@ -1395,7 +1433,7 @@ class DreoCloud extends utils.Adapter {
 		}
 
 		if (definition.channelId === 'settings' && definition.stateId === 'filterInstalled') {
-			return resolvedDevice.device.model === 'DR-HHM001S';
+			return isWritableHumidifierModel(resolvedDevice.device.model);
 		}
 
 		if (this.isDirectionalOscillationFriendlyState(definition)) {

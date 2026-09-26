@@ -1,7 +1,13 @@
 /**
- * Friendly-State identifiers confirmed for the DR-HHM001S humidifier.
+ * Friendly-State identifiers confirmed for the DR-HHM001S and DR-HHM003S humidifiers.
  */
-export type WritableHumidifierStateId = 'mode' | 'fogLevel' | 'autoTargetHumidity' | 'sleepTargetHumidity';
+export type WritableHumidifierStateId =
+	| 'mode'
+	| 'fogLevel'
+	| 'autoTargetHumidity'
+	| 'sleepTargetHumidity'
+	| 'humidityIndicatorLowerThreshold'
+	| 'humidityIndicatorUpperThreshold';
 
 /**
  * Public SDK surface required by the writable humidifier Friendly States.
@@ -21,6 +27,12 @@ export interface WritableHumidifierDevice {
 
 	/** Sets sleep-mode target humidity from 30 through 90 percent. */
 	setHumidifierSleepTargetHumidity(humidity: number): Promise<void>;
+
+	/** Sets the lower humidity-indicator threshold from 15 through 80 percent. */
+	setHumidifierLowerHumidityThreshold(threshold: number): Promise<void>;
+
+	/** Sets the upper humidity-indicator threshold from 20 through 85 percent. */
+	setHumidifierUpperHumidityThreshold(threshold: number): Promise<void>;
 }
 
 interface HumidifierValueRange {
@@ -45,16 +57,24 @@ const HUMIDIFIER_VALUE_RANGES: Readonly<Record<WritableHumidifierStateId, Humidi
 		min: 30,
 		max: 90,
 	},
+	humidityIndicatorLowerThreshold: {
+		min: 15,
+		max: 80,
+	},
+	humidityIndicatorUpperThreshold: {
+		min: 20,
+		max: 85,
+	},
 };
 
 /**
  * Determines whether a model has confirmed writable humidifier semantics.
  *
  * @param model Reported DREO model identifier.
- * @returns Whether the model is the confirmed DR-HHM001S.
+ * @returns Whether the model has confirmed shared humidifier semantics.
  */
 export function isWritableHumidifierModel(model: unknown): boolean {
-	return model === 'DR-HHM001S';
+	return model === 'DR-HHM001S' || model === 'DR-HHM003S';
 }
 
 /**
@@ -149,6 +169,14 @@ export async function writeHumidifierState(
 
 		case 'sleepTargetHumidity':
 			await device.setHumidifierSleepTargetHumidity(normalizedValue);
+			break;
+
+		case 'humidityIndicatorLowerThreshold':
+			await device.setHumidifierLowerHumidityThreshold(normalizedValue);
+			break;
+
+		case 'humidityIndicatorUpperThreshold':
+			await device.setHumidifierUpperHumidityThreshold(normalizedValue);
 			break;
 	}
 

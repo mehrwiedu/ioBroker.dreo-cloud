@@ -13,7 +13,9 @@ interface RecordedCall {
 		| 'setHumidifierMode'
 		| 'setHumidifierFogLevel'
 		| 'setHumidifierAutoTargetHumidity'
-		| 'setHumidifierSleepTargetHumidity';
+		| 'setHumidifierSleepTargetHumidity'
+		| 'setHumidifierLowerHumidityThreshold'
+		| 'setHumidifierUpperHumidityThreshold';
 	value: number;
 }
 
@@ -52,19 +54,43 @@ function createRecordingDevice(model: string, calls: RecordedCall[]): WritableHu
 
 			return Promise.resolve();
 		},
+		setHumidifierLowerHumidityThreshold: value => {
+			calls.push({
+				method: 'setHumidifierLowerHumidityThreshold',
+				value,
+			});
+
+			return Promise.resolve();
+		},
+		setHumidifierUpperHumidityThreshold: value => {
+			calls.push({
+				method: 'setHumidifierUpperHumidityThreshold',
+				value,
+			});
+
+			return Promise.resolve();
+		},
 	};
 }
 
 describe('humidifier model and state guards', () => {
-	it('accepts only the confirmed humidifier model', () => {
+	it('accepts both confirmed humidifier models', () => {
 		expect(isWritableHumidifierModel('DR-HHM001S')).to.equal(true);
+		expect(isWritableHumidifierModel('DR-HHM003S')).to.equal(true);
 		expect(isWritableHumidifierModel('DR-HPF002S')).to.equal(false);
 		expect(isWritableHumidifierModel('DR-HCF007S')).to.equal(false);
 		expect(isWritableHumidifierModel(undefined)).to.equal(false);
 	});
 
-	it('accepts exactly the four confirmed Friendly-State identifiers', () => {
-		for (const stateId of ['mode', 'fogLevel', 'autoTargetHumidity', 'sleepTargetHumidity']) {
+	it('accepts exactly the six confirmed shared Friendly-State identifiers', () => {
+		for (const stateId of [
+			'mode',
+			'fogLevel',
+			'autoTargetHumidity',
+			'sleepTargetHumidity',
+			'humidityIndicatorLowerThreshold',
+			'humidityIndicatorUpperThreshold',
+		]) {
 			expect(isWritableHumidifierStateId(stateId)).to.equal(true);
 		}
 
@@ -87,6 +113,16 @@ describe('normalizeWritableHumidifierValue', () => {
 
 		expect(normalizeWritableHumidifierValue(30, 'sleepTargetHumidity', 'DR-HHM001S')).to.equal(30);
 		expect(normalizeWritableHumidifierValue('90', 'sleepTargetHumidity', 'DR-HHM001S')).to.equal(90);
+
+		expect(normalizeWritableHumidifierValue(2, 'mode', 'DR-HHM003S')).to.equal(2);
+		expect(normalizeWritableHumidifierValue(6, 'fogLevel', 'DR-HHM003S')).to.equal(6);
+		expect(normalizeWritableHumidifierValue(90, 'autoTargetHumidity', 'DR-HHM003S')).to.equal(90);
+		expect(normalizeWritableHumidifierValue(30, 'sleepTargetHumidity', 'DR-HHM003S')).to.equal(30);
+
+		expect(normalizeWritableHumidifierValue(15, 'humidityIndicatorLowerThreshold', 'DR-HHM003S')).to.equal(15);
+		expect(normalizeWritableHumidifierValue('80', 'humidityIndicatorLowerThreshold', 'DR-HHM003S')).to.equal(80);
+		expect(normalizeWritableHumidifierValue(20, 'humidityIndicatorUpperThreshold', 'DR-HHM003S')).to.equal(20);
+		expect(normalizeWritableHumidifierValue('85', 'humidityIndicatorUpperThreshold', 'DR-HHM003S')).to.equal(85);
 	});
 
 	it('rejects state-specific out-of-range and fractional values', () => {
@@ -101,6 +137,19 @@ describe('normalizeWritableHumidifierValue', () => {
 
 		expect(normalizeWritableHumidifierValue(29, 'sleepTargetHumidity', 'DR-HHM001S')).to.equal(undefined);
 		expect(normalizeWritableHumidifierValue(91, 'sleepTargetHumidity', 'DR-HHM001S')).to.equal(undefined);
+
+		expect(normalizeWritableHumidifierValue(14, 'humidityIndicatorLowerThreshold', 'DR-HHM003S')).to.equal(
+			undefined,
+		);
+		expect(normalizeWritableHumidifierValue(81, 'humidityIndicatorLowerThreshold', 'DR-HHM003S')).to.equal(
+			undefined,
+		);
+		expect(normalizeWritableHumidifierValue(19, 'humidityIndicatorUpperThreshold', 'DR-HHM003S')).to.equal(
+			undefined,
+		);
+		expect(normalizeWritableHumidifierValue(86, 'humidityIndicatorUpperThreshold', 'DR-HHM003S')).to.equal(
+			undefined,
+		);
 
 		expect(normalizeWritableHumidifierValue(1.5, 'mode', 'DR-HHM001S')).to.equal(undefined);
 		expect(normalizeWritableHumidifierValue(60.5, 'autoTargetHumidity', 'DR-HHM001S')).to.equal(undefined);
@@ -124,6 +173,8 @@ describe('writeHumidifierState', () => {
 		expect(await writeHumidifierState(device, 'fogLevel', 6)).to.equal(6);
 		expect(await writeHumidifierState(device, 'autoTargetHumidity', 90)).to.equal(90);
 		expect(await writeHumidifierState(device, 'sleepTargetHumidity', '30')).to.equal(30);
+		expect(await writeHumidifierState(device, 'humidityIndicatorLowerThreshold', 35)).to.equal(35);
+		expect(await writeHumidifierState(device, 'humidityIndicatorUpperThreshold', '65')).to.equal(65);
 
 		expect(calls).to.deep.equal([
 			{
@@ -141,6 +192,14 @@ describe('writeHumidifierState', () => {
 			{
 				method: 'setHumidifierSleepTargetHumidity',
 				value: 30,
+			},
+			{
+				method: 'setHumidifierLowerHumidityThreshold',
+				value: 35,
+			},
+			{
+				method: 'setHumidifierUpperHumidityThreshold',
+				value: 65,
 			},
 		]);
 	});
