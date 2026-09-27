@@ -19,7 +19,10 @@ Unofficial ioBroker adapter for selected DREO cloud-connected devices.
 
 The adapter is under active development and intended for controlled testing.
 
-Current development version: `0.1.2-beta.1`.
+Current beta release: `0.1.3-beta.1`.
+
+The release is published on npm and uses `@mehrwiedu/dreo-api` `0.1.3`.
+It has been validated with eight real devices across six DREO models.
 
 Implemented:
 
@@ -37,7 +40,7 @@ Implemented:
 The adapter uses:
 
 ```text
-@mehrwiedu/dreo-api
+@mehrwiedu/dreo-api 0.1.3
 ```
 
 DREO protocol details and native command logic remain inside the SDK.
@@ -192,7 +195,7 @@ npm run build
 
 ## Changelog
 
-### **WORK IN PROGRESS**
+### `0.1.3-beta.1` - 2026-09-27
 
 - Added validated `DR-HHM003S` humidifier support
 - Added validated `DR-HAP009S` air-purifier support
