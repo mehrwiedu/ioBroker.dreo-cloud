@@ -28,8 +28,18 @@
 			"en": "Control and monitor DREO cloud-connected smart home devices.",
 			"de": "Steuern und überwachen Sie mit der Cloud verbundene Smart-Home-Geräte von DREO."
 		},
-		"authors": ["mehrwiedu <david@vonderhoeh.net>"],
-		"keywords": ["dreo", "fan", "ceiling fan", "humidifier", "air purifier", "smart home", "cloud"],
+		"authors": [
+			"mehrwiedu <60202090+mehrwiedu@users.noreply.github.com>"
+		],
+		"keywords": [
+			"dreo",
+			"fan",
+			"ceiling fan",
+			"humidifier",
+			"air purifier",
+			"smart home",
+			"cloud"
+		],
 		"licenseInformation": {
 			"type": "free",
 			"license": "MIT"
@@ -89,6 +99,10 @@
 			"native": {}
 		}
 	],
-	"encryptedNative": ["password"],
-	"protectedNative": ["password"]
+	"encryptedNative": [
+		"password"
+	],
+	"protectedNative": [
+		"password"
+	]
 }

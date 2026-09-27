@@ -4,9 +4,19 @@
 	"adapterName": "dreo-cloud",
 	"title": "DREO Cloud",
 	"description": "Control and monitor DREO cloud-connected smart home devices.",
-	"keywords": ["dreo", "fan", "ceiling fan", "humidifier", "air purifier", "smart home", "cloud"],
+	"keywords": [
+		"dreo",
+		"fan",
+		"ceiling fan",
+		"humidifier",
+		"air purifier",
+		"smart home",
+		"cloud"
+	],
 	"expert": "yes",
-	"features": ["adapter"],
+	"features": [
+		"adapter"
+	],
 	"adminFeatures": [],
 	"type": "climate-control",
 	"startMode": "daemon",
@@ -16,7 +26,11 @@
 	"language": "TypeScript",
 	"nodeVersion": "22",
 	"adminUi": "json",
-	"tools": ["ESLint", "Prettier", "code coverage"],
+	"tools": [
+		"ESLint",
+		"Prettier",
+		"code coverage"
+	],
 	"eslintConfig": "official",
 	"releaseScript": "yes",
 	"devServer": "local",
@@ -24,7 +38,7 @@
 	"quotes": "single",
 	"authorName": "mehrwiedu",
 	"authorGithub": "mehrwiedu",
-	"authorEmail": "david@vonderhoeh.net",
+	"authorEmail": "60202090+mehrwiedu@users.noreply.github.com",
 	"gitRemoteProtocol": "HTTPS",
 	"gitCommit": "no",
 	"defaultBranch": "main",
