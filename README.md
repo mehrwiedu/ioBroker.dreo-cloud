@@ -50,6 +50,8 @@ DREO protocol details and native command logic remain inside the SDK.
 | `DR-HCF001S` | Ceiling fan | 1 | Components without `poweron`, modes, timers and live updates |
 | `DR-HPF002S` | Stand fan | 1 | Fan, modes, display, directional oscillation, independent axis angles and live updates |
 | `DR-HHM001S` | Humidifier | 1 | Power, modes, fog level, target humidity, indicators, filter state, operating information, timers and live updates |
+| `DR-HHM003S` | Humidifier | 1 | Power, modes, fog level, target humidity, warm mist, indicator levels, humidity thresholds, filter state and live updates |
+| `DR-HAP009S` | Air purifier | 1 | Power, modes, fan level, mood light, display, mute, child lock, power recovery, air quality, filter life and live updates |
 
 Other devices may appear through raw states but are not automatically considered fully supported.
 
@@ -127,10 +129,19 @@ humidifier.mode
 humidifier.fogLevel
 humidifier.autoTargetHumidity
 humidifier.sleepTargetHumidity
+humidifier.humidityIndicatorLowerThreshold
+humidifier.humidityIndicatorUpperThreshold
+humidifier.warmMist
+light.mood.on
+light.mood.level
+display.level
+airPurifier.mode
+airPurifier.fanLevel
+settings.powerRecovery
 settings.filterInstalled
 ```
 
-Read-only operating information includes filter life and operating hours where reported.
+Read-only operating information includes filter life, operating hours, PM2.5 and air-quality level where reported.
 
 ## Write behavior
 
@@ -165,7 +176,6 @@ The adapter depends on private DREO cloud APIs and does not provide local-only c
 - Apple and Google login are not supported.
 - Only EU and US regions are available.
 - Not every raw state has a friendly mapping.
-- Real hot-add still needs a dedicated end-to-end validation run.
 - Friendly structures are not yet generated when a known key first appears only after initialization.
 - Partially shared homes/devices still require dedicated testing.
 - DREO can change the private API without notice.
@@ -184,9 +194,12 @@ npm run build
 
 ### **WORK IN PROGRESS**
 
-- Updated device coverage and supported controls
-- Removed unverified ceiling-fan favorite control
+- Added validated `DR-HHM003S` humidifier support
+- Added validated `DR-HAP009S` air-purifier support
+- Validated runtime hot-add without an adapter restart
+- Added model-aware write routing for overlapping Friendly-State paths
 - Added control-reply error propagation through the SDK
+- Removed unverified ceiling-fan favorite control
 
 See [CHANGELOG.md](CHANGELOG.md).
 
