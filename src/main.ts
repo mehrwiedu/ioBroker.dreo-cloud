@@ -54,6 +54,7 @@ import {
 	normalizeWritableBoolean,
 	normalizeWritableDirectionalOscillationAngle,
 	normalizeWritableDirectionalOscillationMode,
+	selectAvailableWritableFriendlyStateDefinition,
 	selectFriendlyWriteAcknowledgementValue,
 	selectDisplayRawKey,
 } from './lib/friendly-state';
@@ -2163,9 +2164,17 @@ class DreoCloud extends utils.Adapter {
 
 		const deviceId = parts[1];
 		const friendlyPath = parts.slice(2).join('.');
+		const resolvedDevice = this.findResolvedDeviceByObjectId(deviceId);
 
-		const definition = FRIENDLY_STATE_DEFINITIONS.find(
-			candidate => candidate.path.join('.') === friendlyPath && this.isWritableFriendlyStateDefinition(candidate),
+		if (!resolvedDevice) {
+			return undefined;
+		}
+
+		const availableDefinitions = this.getAvailableFriendlyStateDefinitions(resolvedDevice);
+		const definition = selectAvailableWritableFriendlyStateDefinition(
+			friendlyPath,
+			availableDefinitions,
+			candidate => this.isWritableFriendlyStateForDevice(candidate, resolvedDevice),
 		);
 
 		if (!definition) {

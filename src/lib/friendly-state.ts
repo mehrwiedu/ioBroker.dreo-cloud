@@ -6,6 +6,39 @@ import type {
 } from '@mehrwiedu/dreo-api';
 
 /**
+ * Minimum shape required to resolve a Friendly-State definition by its
+ * ioBroker object path.
+ */
+export interface FriendlyStatePathDefinition {
+	/** Relative ioBroker Friendly-State object path. */
+	readonly path: readonly string[];
+}
+
+/**
+ * Selects a writable Friendly-State definition from the definitions that are
+ * already confirmed as available for the concrete device.
+ *
+ * This deliberately resolves duplicate ioBroker paths only after
+ * model/device-specific availability filtering. Different DREO product
+ * families may expose the same Friendly-State path with different native
+ * semantics.
+ *
+ * @param friendlyPath Relative Friendly-State path, for example light.mood.level.
+ * @param availableDefinitions Definitions available for the concrete device.
+ * @param isWritableDefinition Device-specific writable-state predicate.
+ * @returns The matching writable definition, or undefined.
+ */
+export function selectAvailableWritableFriendlyStateDefinition<TDefinition extends FriendlyStatePathDefinition>(
+	friendlyPath: string,
+	availableDefinitions: readonly TDefinition[],
+	isWritableDefinition: (definition: TDefinition) => boolean,
+): TDefinition | undefined {
+	return availableDefinitions.find(
+		definition => definition.path.join('.') === friendlyPath && isWritableDefinition(definition),
+	);
+}
+
+/**
  * Normalizes an on/off state whose effective value may depend on the device power state.
  *
  * Devices without a separate power state use the target state directly.

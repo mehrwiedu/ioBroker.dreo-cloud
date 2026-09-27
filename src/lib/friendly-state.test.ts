@@ -12,9 +12,66 @@ import {
 	normalizeWritableBoolean,
 	normalizeWritableDirectionalOscillationAngle,
 	normalizeWritableDirectionalOscillationMode,
+	selectAvailableWritableFriendlyStateDefinition,
 	selectFriendlyWriteAcknowledgementValue,
 	selectDisplayRawKey,
 } from './friendly-state';
+
+describe('selectAvailableWritableFriendlyStateDefinition', () => {
+	const airPurifierMoodLevel = {
+		path: ['light', 'mood', 'level'],
+		channelId: 'airPurifierMoodLight',
+		rawKey: 'rgblevel',
+	};
+
+	const humidifierMoodLevel = {
+		path: ['light', 'mood', 'level'],
+		channelId: 'moodLight',
+		rawKey: 'rgblevel',
+	};
+
+	const airPurifierMoodOn = {
+		path: ['light', 'mood', 'on'],
+		channelId: 'airPurifierMoodLight',
+		rawKey: 'rgbalwayson',
+	};
+
+	const humidifierMoodOn = {
+		path: ['light', 'mood', 'on'],
+		channelId: 'moodLight',
+		rawKey: 'rgblevel',
+	};
+
+	it('resolves duplicate mood-light paths from the concrete device availability set', () => {
+		expect(
+			selectAvailableWritableFriendlyStateDefinition('light.mood.level', [airPurifierMoodLevel], () => true)
+				?.channelId,
+		).to.equal('airPurifierMoodLight');
+
+		expect(
+			selectAvailableWritableFriendlyStateDefinition('light.mood.level', [humidifierMoodLevel], () => true)
+				?.channelId,
+		).to.equal('moodLight');
+
+		expect(
+			selectAvailableWritableFriendlyStateDefinition('light.mood.on', [airPurifierMoodOn], () => true)?.channelId,
+		).to.equal('airPurifierMoodLight');
+
+		expect(
+			selectAvailableWritableFriendlyStateDefinition('light.mood.on', [humidifierMoodOn], () => true)?.channelId,
+		).to.equal('moodLight');
+	});
+
+	it('does not route to a colliding definition that is unavailable or not writable', () => {
+		expect(
+			selectAvailableWritableFriendlyStateDefinition('light.mood.level', [airPurifierMoodLevel], () => false),
+		).to.equal(undefined);
+
+		expect(
+			selectAvailableWritableFriendlyStateDefinition('light.mood.level', [humidifierMoodLevel], () => false),
+		).to.equal(undefined);
+	});
+});
 
 describe('normalizePowerScopedOnState', () => {
 	it('returns true when power and target state are enabled', () => {
