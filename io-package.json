@@ -1,8 +1,12 @@
 {
 	"common": {
 		"name": "dreo-cloud",
-		"version": "0.1.2-beta.1",
+		"version": "0.1.3-beta.1",
 		"news": {
+			"0.1.3-beta.1": {
+				"en": "Added support for DR-HAP009S and DR-HHM003S, runtime device discovery, and improved model-aware Friendly-State routing",
+				"de": "Unterstützung für DR-HAP009S und DR-HHM003S, Geräteerkennung zur Laufzeit und verbesserte modellabhängige Friendly-State-Zuordnung hinzugefügt"
+			},
 			"0.1.2-beta.1": {
 				"en": "Added support for older DREO devices without a poweron state",
 				"de": "Unterstützung für ältere DREO-Geräte ohne poweron-Datenpunkt hinzugefügt"
