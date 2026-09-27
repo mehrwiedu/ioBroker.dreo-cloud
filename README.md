@@ -210,7 +210,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 MIT License
 
-Copyright (c) 2026 mehrwiedu <david@vonderhoeh.net>
+Copyright (c) 2026 mehrwiedu <60202090+mehrwiedu@users.noreply.github.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
