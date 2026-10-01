@@ -17,11 +17,11 @@ Unofficial ioBroker adapter for selected DREO cloud-connected devices.
 
 ## Current status
 
-The adapter is under active development and intended for controlled testing.
+The adapter is under active development.
 
-Current beta release: `0.1.3-beta.1`.
+Current release: `0.1.3`.
 
-The release is published on npm and uses `@mehrwiedu/dreo-api` `0.1.3`.
+This release uses `@mehrwiedu/dreo-api` `0.1.3`.
 It has been validated with eight real devices across six DREO models.
 
 Implemented:
@@ -193,6 +193,12 @@ npm run build
 ```
 
 ## Changelog
+
+### 0.1.3 - 2026-10-01
+
+- Promoted the validated 0.1.3 beta feature set to a regular release
+- Added current ioBroker repository-checker compatibility and complete admin translations
+- Clarified that either the primary owner account or an authorized secondary email/password account can be used
 
 ### 0.1.3-beta.1 - 2026-09-27
 
