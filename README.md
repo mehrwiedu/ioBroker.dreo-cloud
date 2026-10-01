@@ -17,11 +17,11 @@ Unofficial ioBroker adapter for selected DREO cloud-connected devices.
 
 ## Current status
 
-The adapter is under active development and intended for controlled testing.
+The adapter is under active development.
 
-Current beta release: `0.1.3-beta.1`.
+Current release: `0.1.3`.
 
-The release is published on npm and uses `@mehrwiedu/dreo-api` `0.1.3`.
+This release uses `@mehrwiedu/dreo-api` `0.1.3`.
 It has been validated with eight real devices across six DREO models.
 
 Implemented:
@@ -60,12 +60,11 @@ Other devices may appear through raw states but are not automatically considered
 
 ## Account setup
 
-Use a separate DREO account that supports email/password login.
+Use a DREO account that supports email/password login.
 
-1. Keep the devices in the primary owner account.
-2. Create a secondary email/password account.
-3. Share the DREO home with that account.
-4. Configure the adapter with the secondary account.
+The adapter can use either the primary owner account or a separate secondary account with access to the DREO home.
+
+Using a dedicated secondary account is recommended for adapter operation, but it is not required.
 
 Apple and Google login are not supported.
 
@@ -195,7 +194,13 @@ npm run build
 
 ## Changelog
 
-### `0.1.3-beta.1` - 2026-09-27
+### 0.1.3 - 2026-10-01
+
+- Promoted the validated 0.1.3 beta feature set to a regular release
+- Added current ioBroker repository-checker compatibility and complete admin translations
+- Clarified that either the primary owner account or an authorized secondary email/password account can be used
+
+### 0.1.3-beta.1 - 2026-09-27
 
 - Added validated `DR-HHM003S` humidifier support
 - Added validated `DR-HAP009S` air-purifier support
@@ -204,13 +209,34 @@ npm run build
 - Added control-reply error propagation through the SDK
 - Removed unverified ceiling-fan favorite control
 
-See [CHANGELOG.md](CHANGELOG.md).
+### 0.1.2-beta.1
+
+- Added support for older DREO devices without a `poweron` state
+
+### 0.1.1 - 2026-07-17
+
+- Added the official DREO Cloud adapter logo
+- Moved full device serial numbers from info logs to debug logs
+- Enabled GitHub Actions trusted publishing for future npm releases
+
+### 0.1.0 - 2026-07-17
+
+- Added the Creator-based ioBroker adapter structure
+- Added DREO account configuration for EU and US regions
+- Added FamilyTree-based device discovery
+- Added runtime discovery of newly available devices
+- Added automatic creation of device, information, raw, and friendly states
+- Added live raw and friendly state updates through the DREO WebSocket connection
+- Added bidirectional control of supported power, fan, speed, and light functions
+- Added dynamic read-only creation of previously unknown raw states
+- Added automatic re-login and WebSocket reconnect after renewed DREO sessions
+- Added effective friendly on/off states while preserving original raw device values
 
 ## License
 
 MIT License
 
-Copyright (c) 2026 mehrwiedu <60202090+mehrwiedu@users.noreply.github.com>
+Copyright (c) 2026 mehrwiedu <david@vonderhoeh.net>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

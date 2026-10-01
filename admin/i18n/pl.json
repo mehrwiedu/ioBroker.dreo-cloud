@@ -1,0 +1,9 @@
+{
+	"dreo-cloud adapter settings": "Ustawienia adaptera DREO Cloud",
+	"email": "Adres e-mail DREO",
+	"email_help": "Adres e-mail konta DREO używanego przez adapter.",
+	"password": "Hasło DREO",
+	"password_help": "Hasło konta DREO używanego przez adapter.",
+	"region": "Region chmury",
+	"region_help": "Region DREO Cloud przypisany do konta."
+}

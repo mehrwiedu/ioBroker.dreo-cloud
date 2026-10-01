@@ -1,35 +1,89 @@
 {
 	"common": {
 		"name": "dreo-cloud",
-		"version": "0.1.3-beta.1",
+		"version": "0.1.3",
 		"news": {
-			"0.1.3-beta.1": {
+			"0.1.3": {
 				"en": "Added support for DR-HAP009S and DR-HHM003S, runtime device discovery, and improved model-aware Friendly-State routing",
-				"de": "Unterstützung für DR-HAP009S und DR-HHM003S, Geräteerkennung zur Laufzeit und verbesserte modellabhängige Friendly-State-Zuordnung hinzugefügt"
+				"de": "Unterstützung für DR-HAP009S und DR-HHM003S, Geräteerkennung zur Laufzeit und verbesserte modellabhängige Friendly-State-Zuordnung hinzugefügt",
+				"es": "Se añadió compatibilidad con DR-HAP009S y DR-HHM003S, detección de dispositivos en tiempo de ejecución y un enrutamiento mejorado de Friendly States según el modelo",
+				"fr": "Ajout de la prise en charge des DR-HAP009S et DR-HHM003S, de la détection des appareils à l’exécution et d’un routage amélioré des Friendly States selon le modèle",
+				"it": "Aggiunto il supporto per DR-HAP009S e DR-HHM003S, il rilevamento dei dispositivi in fase di esecuzione e un instradamento migliorato dei Friendly States in base al modello",
+				"nl": "Ondersteuning toegevoegd voor DR-HAP009S en DR-HHM003S, apparaatherkenning tijdens runtime en verbeterde modelafhankelijke routering van Friendly States",
+				"pl": "Dodano obsługę DR-HAP009S i DR-HHM003S, wykrywanie urządzeń podczas działania oraz ulepszone, zależne od modelu trasowanie Friendly States",
+				"pt": "Adicionado suporte para DR-HAP009S e DR-HHM003S, deteção de dispositivos em tempo de execução e encaminhamento melhorado de Friendly States consoante o modelo",
+				"ru": "Добавлена поддержка DR-HAP009S и DR-HHM003S, обнаружение устройств во время работы и улучшенная маршрутизация Friendly States с учётом модели",
+				"uk": "Додано підтримку DR-HAP009S і DR-HHM003S, виявлення пристроїв під час роботи та покращену маршрутизацію Friendly States з урахуванням моделі",
+				"zh-cn": "新增对 DR-HAP009S 和 DR-HHM003S 的支持、运行时设备发现以及改进的模型感知 Friendly State 路由"
 			},
 			"0.1.2-beta.1": {
 				"en": "Added support for older DREO devices without a poweron state",
-				"de": "Unterstützung für ältere DREO-Geräte ohne poweron-Datenpunkt hinzugefügt"
+				"de": "Unterstützung für ältere DREO-Geräte ohne poweron-Datenpunkt hinzugefügt",
+				"es": "Se añadió compatibilidad con dispositivos DREO antiguos sin un estado poweron",
+				"fr": "Ajout de la prise en charge des anciens appareils DREO sans état poweron",
+				"it": "Aggiunto il supporto per i dispositivi DREO meno recenti privi dello stato poweron",
+				"nl": "Ondersteuning toegevoegd voor oudere DREO-apparaten zonder poweron-status",
+				"pl": "Dodano obsługę starszych urządzeń DREO bez stanu poweron",
+				"pt": "Adicionado suporte para dispositivos DREO mais antigos sem um estado poweron",
+				"ru": "Добавлена поддержка старых устройств DREO без состояния poweron",
+				"uk": "Додано підтримку старіших пристроїв DREO без стану poweron",
+				"zh-cn": "新增对没有 poweron 状态的旧款 DREO 设备的支持"
 			},
 			"0.1.1": {
 				"en": "Added the official adapter logo and moved full device serial numbers to debug logs only",
-				"de": "Offizielles Adapterlogo hinzugefügt und vollständige Geräteseriennummern nur noch im Debug-Log ausgegeben"
+				"de": "Offizielles Adapterlogo hinzugefügt und vollständige Geräteseriennummern nur noch im Debug-Log ausgegeben",
+				"es": "Se añadió el logotipo oficial del adaptador y los números de serie completos de los dispositivos ahora solo aparecen en los registros de depuración",
+				"fr": "Ajout du logo officiel de l’adaptateur et affichage des numéros de série complets des appareils uniquement dans les journaux de débogage",
+				"it": "Aggiunto il logo ufficiale dell’adattatore e limitati i numeri di serie completi dei dispositivi ai soli log di debug",
+				"nl": "Het officiële adapterlogo is toegevoegd en volledige serienummers van apparaten worden alleen nog in debuglogs weergegeven",
+				"pl": "Dodano oficjalne logo adaptera, a pełne numery seryjne urządzeń są teraz wyświetlane tylko w logach debugowania",
+				"pt": "Adicionado o logótipo oficial do adaptador e os números de série completos dos dispositivos passaram a ser apresentados apenas nos registos de depuração",
+				"ru": "Добавлен официальный логотип адаптера, а полные серийные номера устройств теперь выводятся только в журналах отладки",
+				"uk": "Додано офіційний логотип адаптера, а повні серійні номери пристроїв тепер виводяться лише в журналах налагодження",
+				"zh-cn": "新增官方适配器徽标，并将完整设备序列号限制为仅在调试日志中显示"
 			},
 			"0.1.0": {
 				"en": "Initial public release",
-				"de": "Erste öffentliche Veröffentlichung"
+				"de": "Erste öffentliche Veröffentlichung",
+				"es": "Primera versión pública",
+				"fr": "Première version publique",
+				"it": "Prima versione pubblica",
+				"nl": "Eerste openbare release",
+				"pl": "Pierwsze publiczne wydanie",
+				"pt": "Primeira versão pública",
+				"ru": "Первый публичный выпуск",
+				"uk": "Перший публічний випуск",
+				"zh-cn": "首次公开发布"
 			}
 		},
 		"titleLang": {
 			"en": "DREO Cloud",
-			"de": "DREO Cloud"
+			"de": "DREO Cloud",
+			"es": "DREO Cloud",
+			"fr": "DREO Cloud",
+			"it": "DREO Cloud",
+			"nl": "DREO Cloud",
+			"pl": "DREO Cloud",
+			"pt": "DREO Cloud",
+			"ru": "DREO Cloud",
+			"uk": "DREO Cloud",
+			"zh-cn": "DREO Cloud"
 		},
 		"desc": {
 			"en": "Control and monitor DREO cloud-connected smart home devices.",
-			"de": "Steuern und überwachen Sie mit der Cloud verbundene Smart-Home-Geräte von DREO."
+			"de": "Steuern und überwachen Sie mit der Cloud verbundene Smart-Home-Geräte von DREO.",
+			"es": "Controla y supervisa dispositivos domésticos inteligentes DREO conectados a la nube.",
+			"fr": "Contrôlez et surveillez les appareils domotiques DREO connectés au cloud.",
+			"it": "Controlla e monitora i dispositivi per la casa intelligente DREO connessi al cloud.",
+			"nl": "Bedien en bewaak DREO-smarthomeapparaten die met de cloud zijn verbonden.",
+			"pl": "Steruj i monitoruj urządzenia inteligentnego domu DREO połączone z chmurą.",
+			"pt": "Controle e monitorize dispositivos domésticos inteligentes DREO ligados à cloud.",
+			"ru": "Управляйте устройствами умного дома DREO, подключёнными к облаку, и отслеживайте их состояние.",
+			"uk": "Керуйте пристроями розумного дому DREO, підключеними до хмари, та відстежуйте їхній стан.",
+			"zh-cn": "控制和监控连接到 DREO 云的智能家居设备。"
 		},
 		"authors": [
-			"mehrwiedu <60202090+mehrwiedu@users.noreply.github.com>"
+			"mehrwiedu <david@vonderhoeh.net>"
 		],
 		"keywords": [
 			"dreo",
@@ -37,7 +91,6 @@
 			"ceiling fan",
 			"humidifier",
 			"air purifier",
-			"smart home",
 			"cloud"
 		],
 		"licenseInformation": {
@@ -66,9 +119,10 @@
 		],
 		"globalDependencies": [
 			{
-				"admin": ">=7.0.23"
+				"admin": ">=7.6.20"
 			}
-		]
+		],
+		"nogit": true
 	},
 	"native": {
 		"email": "",
