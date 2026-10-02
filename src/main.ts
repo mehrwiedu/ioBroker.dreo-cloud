@@ -59,7 +59,12 @@ import {
 	selectDisplayRawKey,
 } from './lib/friendly-state';
 import { getFilterLifeRemainingRawKey, normalizeFilterLifeRemaining } from './lib/filter-life';
-import { formatDiscoveredRawKeysMessage } from './lib/raw-state';
+import {
+	formatDiscoveredRawKeysMessage,
+	mapRawStateRole,
+	mapRawStateType,
+	restoreStoredRawStateMetadata,
+} from './lib/raw-state';
 import { isWritableSettingsStateId, writeSettingsBooleanState } from './lib/settings-write';
 
 interface FriendlyStateDefinition {
@@ -117,7 +122,7 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		stateName: 'Mode',
 		rawKey: 'mode',
 		type: 'number',
-		role: 'value',
+		role: 'level.mode.fan',
 	},
 	{
 		channelId: 'airPurifier',
@@ -127,7 +132,7 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		stateName: 'Operating mode',
 		rawKey: 'mode',
 		type: 'string',
-		role: 'value',
+		role: 'state',
 		states: { ...AIR_PURIFIER_MODE_STATES },
 	},
 	{
@@ -220,7 +225,7 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		stateName: 'Mode',
 		rawKey: 'mode',
 		type: 'number',
-		role: 'value',
+		role: 'level',
 		min: 0,
 		max: 2,
 		step: 1,
@@ -317,7 +322,7 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		stateName: 'Oscillation mode',
 		rawKey: 'oscmode',
 		type: 'number',
-		role: 'value',
+		role: 'level.mode.swing',
 		min: 0,
 		max: 3,
 		step: 1,
@@ -336,7 +341,7 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		stateName: 'Horizontal oscillation angle',
 		rawKey: 'cruiseconf',
 		type: 'number',
-		role: 'value',
+		role: 'level',
 		unit: '°',
 		min: 30,
 		max: 120,
@@ -356,7 +361,7 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		stateName: 'Vertical oscillation angle',
 		rawKey: 'cruiseconf',
 		type: 'number',
-		role: 'value',
+		role: 'level',
 		unit: '°',
 		min: 30,
 		max: 120,
@@ -417,7 +422,7 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		stateName: 'Duration',
 		rawKey: 'scenes',
 		type: 'number',
-		role: 'value.interval',
+		role: 'level.timer.sleep',
 		unit: 'min',
 		min: 0,
 		max: 60,
@@ -431,7 +436,7 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		stateName: 'Start brightness',
 		rawKey: 'scenes',
 		type: 'number',
-		role: 'level.dimmer',
+		role: 'value.dimmer',
 		unit: '%',
 		min: 0,
 		max: 100,
@@ -599,7 +604,7 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		stateName: 'Duration',
 		rawKey: 'timeron',
 		type: 'number',
-		role: 'value.interval',
+		role: 'level.timer',
 		unit: 'min',
 		min: 0,
 		max: 719,
@@ -623,7 +628,7 @@ const FRIENDLY_STATE_DEFINITIONS: FriendlyStateDefinition[] = [
 		stateName: 'Duration',
 		rawKey: 'timeroff',
 		type: 'number',
-		role: 'value.interval',
+		role: 'level.timer.off',
 		unit: 'min',
 		min: 0,
 		max: 719,
@@ -797,6 +802,7 @@ class DreoCloud extends utils.Adapter {
 
 		await this.createDevicesRootObject();
 		await this.createDeviceObjects(resolvedDevice);
+		await this.refreshStoredRuntimeRawStateObjects(resolvedDevice);
 		await this.createFriendlyDeviceObjects(resolvedDevice);
 		await this.setDeviceInfoStates(resolvedDevice);
 		await this.setRawDeviceStates(resolvedDevice);
@@ -806,8 +812,8 @@ class DreoCloud extends utils.Adapter {
 	}
 
 	private async createDevicesRootObject(): Promise<void> {
-		await this.setObjectNotExistsAsync('devices', {
-			type: 'channel',
+		await this.extendObjectAsync('devices', {
+			type: 'folder',
 			common: {
 				name: 'DREO devices',
 			},
@@ -894,8 +900,8 @@ class DreoCloud extends utils.Adapter {
 			type: 'state',
 			common: {
 				name: state.description,
-				type: this.mapRawStateType(state),
-				role: this.mapRawStateRole(state),
+				type: mapRawStateType(state),
+				role: mapRawStateRole(state),
 				read: true,
 				write: false,
 			},
@@ -909,38 +915,28 @@ class DreoCloud extends utils.Adapter {
 		});
 	}
 
-	private mapRawStateType(state: DiscoveredState): 'boolean' | 'number' | 'string' | 'mixed' {
-		switch (state.valueType) {
-			case 'boolean':
-				return 'boolean';
+	private async refreshStoredRuntimeRawStateObjects(resolvedDevice: ResolvedDevice): Promise<void> {
+		const deviceId = this.createDeviceObjectId(resolvedDevice);
+		const startupRawKeys = new Set(resolvedDevice.states.map(state => state.key));
+		const objectPattern = `${this.namespace}.devices.${deviceId}.raw.*`;
+		const storedObjects = await this.getForeignObjectsAsync(objectPattern, 'state');
 
-			case 'number':
-				return 'number';
+		for (const [objectId, object] of Object.entries(storedObjects)) {
+			const state = restoreStoredRawStateMetadata(object?.native);
 
-			case 'string':
-				return 'string';
+			if (!state || startupRawKeys.has(state.key)) {
+				continue;
+			}
 
-			case 'object':
-			case 'unknown':
-			default:
-				return 'string';
+			await this.extendForeignObjectAsync(objectId, {
+				common: {
+					type: mapRawStateType(state),
+					role: mapRawStateRole(state),
+					read: true,
+					write: false,
+				},
+			});
 		}
-	}
-
-	private mapRawStateRole(state: DiscoveredState): string {
-		if (state.category === 'diagnostic') {
-			return 'value';
-		}
-
-		if (state.category === 'information') {
-			return 'info';
-		}
-
-		if (state.valueType === 'boolean') {
-			return 'indicator';
-		}
-
-		return 'value';
 	}
 
 	private async createFriendlyDeviceObjects(resolvedDevice: ResolvedDevice): Promise<void> {
@@ -1124,7 +1120,9 @@ class DreoCloud extends utils.Adapter {
 		const writable = this.isWritableFriendlyStateForDevice(definition, resolvedDevice);
 		const discoveredState = resolvedDevice.states.find(state => state.key === definition.rawKey);
 		const numberConstraint =
-			discoveredState?.constraint?.type === 'number' ? discoveredState.constraint : undefined;
+			definition.type === 'number' && discoveredState?.constraint?.type === 'number'
+				? discoveredState.constraint
+				: undefined;
 		const fanModeMetadata = this.isFanModeFriendlyState(definition)
 			? getConfirmedFanModeMetadata(resolvedDevice.device.model)
 			: undefined;

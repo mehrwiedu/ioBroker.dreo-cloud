@@ -196,6 +196,13 @@ npm run build
 
 ## Changelog
 
+### **WORK IN PROGRESS**
+
+- Fixed the ioBroker object hierarchy by exposing the device container as a folder
+- Updated Friendly-State and RAW-state roles to comply with current ioBroker object-structure requirements
+- Prevented numeric constraints from being applied to non-numeric Friendly States
+- Added startup migration for previously stored runtime-discovered RAW states so corrected type and role metadata is applied after upgrades
+
 ### 0.1.3 - 2026-10-01
 
 - Promoted the validated 0.1.3 beta feature set to a regular release
