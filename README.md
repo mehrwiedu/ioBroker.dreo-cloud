@@ -13,6 +13,8 @@
 
 Unofficial ioBroker adapter for selected DREO cloud-connected devices.
 
+DREO manufacturer website: https://www.dreo.com/
+
 > This project is not affiliated with, endorsed by, or supported by DREO.
 
 ## Current status
