@@ -202,6 +202,7 @@ npm run build
 - Updated Friendly-State and RAW-state roles to comply with current ioBroker object-structure requirements
 - Prevented numeric constraints from being applied to non-numeric Friendly States
 - Added startup migration for previously stored runtime-discovered RAW states so corrected type and role metadata is applied after upgrades
+- Updated `@mehrwiedu/dreo-api` to `0.1.4`, including the validated `DR-HCF007S` power/component-mask behavior
 
 ### 0.1.3 - 2026-10-01
 
