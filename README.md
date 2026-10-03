@@ -21,9 +21,9 @@ DREO manufacturer website: https://www.dreo.com/
 
 The adapter is under active development.
 
-Current release: `0.1.3`.
+Current release: `0.1.4`.
 
-This release uses `@mehrwiedu/dreo-api` `0.1.3`.
+This release uses `@mehrwiedu/dreo-api` `0.1.4`.
 It has been validated with eight real devices across six DREO models.
 
 Implemented:
@@ -42,7 +42,7 @@ Implemented:
 The adapter uses:
 
 ```text
-@mehrwiedu/dreo-api 0.1.3
+@mehrwiedu/dreo-api 0.1.4
 ```
 
 DREO protocol details and native command logic remain inside the SDK.
@@ -51,7 +51,7 @@ DREO protocol details and native command logic remain inside the SDK.
 
 | Model | Type | Quantity | Validated areas |
 |---|---|---:|---|
-| `DR-HCF007S` | Ceiling fan | 3 | Fan, modes, main light, brightness, color temperature, atmosphere light, timers, child lock and live updates |
+| `DR-HCF007S` | Ceiling fan | 3 | Fan, modes, main light, brightness, color temperature, atmosphere light, timers, child lock, power/component-mask semantics and live updates |
 | `DR-HCF001S` | Ceiling fan | 1 | Components without `poweron`, modes, timers and live updates |
 | `DR-HPF002S` | Stand fan | 1 | Fan, modes, display, directional oscillation, independent axis angles and live updates |
 | `DR-HHM001S` | Humidifier | 1 | Power, modes, fog level, target humidity, indicators, filter state, operating information, timers and live updates |
@@ -195,8 +195,7 @@ npm run build
 ```
 
 ## Changelog
-
-### **WORK IN PROGRESS**
+### 0.1.4 (2026-10-03)
 
 - Fixed the ioBroker object hierarchy by exposing the device container as a folder
 - Updated Friendly-State and RAW-state roles to comply with current ioBroker object-structure requirements
