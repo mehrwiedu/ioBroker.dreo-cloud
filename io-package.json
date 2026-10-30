@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "dreo-cloud",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "news": {
+      "0.1.5": {
+        "en": "Updated @mehrwiedu/dreo-api to 0.1.5, adding a 30-second HTTP timeout for cloud requests.\nRemoved an unused admin translation key from all 11 language files.",
+        "de": "@mehrwiedu/dreo-api auf Version 0.1.5 aktualisiert; HTTP-Zeitlimit für Cloud-Anfragen auf 30 Sekunden gesetzt.\nEinen nicht verwendeten Admin-Übersetzungsschlüssel aus allen 11 Sprachdateien entfernt.",
+        "ru": "Обновлён @mehrwiedu/dreo-api до версии 0.1.5; для облачных HTTP-запросов добавлен тайм-аут 30 секунд.\nУдалён неиспользуемый ключ перевода панели администратора из всех 11 языковых файлов.",
+        "pt": "Atualizado @mehrwiedu/dreo-api para a versão 0.1.5, com um tempo limite de 30 segundos para pedidos HTTP à nuvem.\nRemovida uma chave de tradução de administração não utilizada dos 11 ficheiros de idioma.",
+        "nl": "@mehrwiedu/dreo-api bijgewerkt naar versie 0.1.5, met een HTTP-time-out van 30 seconden voor cloudverzoeken.\nEen ongebruikte vertalingssleutel voor het beheerpaneel verwijderd uit alle 11 taalbestanden.",
+        "fr": "Mise à jour de @mehrwiedu/dreo-api vers la version 0.1.5, avec un délai HTTP de 30 secondes pour les requêtes cloud.\nSuppression d'une clé de traduction d'administration inutilisée des 11 fichiers de langue.",
+        "it": "Aggiornato @mehrwiedu/dreo-api alla versione 0.1.5, aggiungendo un timeout HTTP di 30 secondi per le richieste cloud.\nRimossa una chiave di traduzione amministrativa inutilizzata da tutti gli 11 file di lingua.",
+        "es": "Actualizado @mehrwiedu/dreo-api a la versión 0.1.5, con un tiempo de espera HTTP de 30 segundos para las solicitudes a la nube.\nEliminada una clave de traducción del panel de administración sin usar de los 11 archivos de idioma.",
+        "pl": "Zaktualizowano @mehrwiedu/dreo-api do wersji 0.1.5, dodając 30-sekundowy limit czasu żądań HTTP do chmury.\nUsunięto nieużywany klucz tłumaczenia panelu administracyjnego ze wszystkich 11 plików językowych.",
+        "uk": "Оновлено @mehrwiedu/dreo-api до версії 0.1.5; додано 30-секундний тайм-аут HTTP-запитів до хмари.\nВидалено невикористаний ключ перекладу панелі адміністратора з усіх 11 мовних файлів.",
+        "zh-cn": "将 @mehrwiedu/dreo-api 更新至 0.1.5，为云端 HTTP 请求添加 30 秒超时限制。\n从全部 11 个语言文件中移除了未使用的管理界面翻译键。"
+      },
       "0.1.4": {
         "en": "Fixed the ioBroker object structure and state metadata, added upgrade migration, and updated @mehrwiedu/dreo-api to 0.1.4 with validated DR-HCF007S power/component-mask behavior",
         "de": "ioBroker-Objektstruktur und State-Metadaten korrigiert, Upgrade-Migration ergänzt und @mehrwiedu/dreo-api auf 0.1.4 mit validierter DR-HCF007S Power-/Komponentenmasken-Logik aktualisiert",

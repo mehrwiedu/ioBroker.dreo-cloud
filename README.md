@@ -195,8 +195,7 @@ npm run build
 ```
 
 ## Changelog
-
-### **WORK IN PROGRESS**
+### 0.1.5 (2026-10-30)
 
 - Updated `@mehrwiedu/dreo-api` to `0.1.5`, adding a 30-second HTTP timeout for cloud requests.
 - Removed an unused admin translation key from all 11 language files.
