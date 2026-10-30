@@ -21,9 +21,9 @@ DREO manufacturer website: https://www.dreo.com/
 
 The adapter is under active development.
 
-Current release: `0.1.4`.
+Current release: `0.1.5`.
 
-This release uses `@mehrwiedu/dreo-api` `0.1.4`.
+This release uses `@mehrwiedu/dreo-api` `0.1.5`.
 It has been validated with eight real devices across six DREO models.
 
 Implemented:
@@ -42,7 +42,7 @@ Implemented:
 The adapter uses:
 
 ```text
-@mehrwiedu/dreo-api 0.1.4
+@mehrwiedu/dreo-api 0.1.5
 ```
 
 DREO protocol details and native command logic remain inside the SDK.
@@ -195,6 +195,12 @@ npm run build
 ```
 
 ## Changelog
+
+### **WORK IN PROGRESS**
+
+- Updated `@mehrwiedu/dreo-api` to `0.1.5`, adding a 30-second HTTP timeout for cloud requests.
+- Removed an unused admin translation key from all 11 language files.
+
 ### 0.1.4 (2026-10-03)
 
 - Fixed the ioBroker object hierarchy by exposing the device container as a folder
